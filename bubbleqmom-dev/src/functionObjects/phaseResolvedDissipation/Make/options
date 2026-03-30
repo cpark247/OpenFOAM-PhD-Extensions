@@ -1,0 +1,23 @@
+EXE_INC = \
+    -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/phaseSystems/lnInclude \
+    -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/multiphaseSystems/lnInclude \
+    -I$(LIB_SRC)/transportModels/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/basic/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/specie/lnInclude \
+    -I$(LIB_SRC)/thermophysicalModels/reactionThermo/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/momentumTransportModels/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/compressible/lnInclude \
+    -I$(LIB_SRC)/MomentumTransportModels/phaseCompressible/lnInclude \
+    -I$(LIB_SRC)/ThermophysicalTransportModels/lnInclude \
+    -I$(LIB_SRC)/finiteVolume/lnInclude \
+    -I$(LIB_SRC)/meshTools/lnInclude 
+
+LIB_LIBS = \
+    -lfiniteVolume \
+    -lmeshTools \
+    -lfluidThermophysicalModels \
+    -ltransportModels \
+    -lmomentumTransportModels \
+    -lincompressibleMomentumTransportModels \
+    -lcompressibleMomentumTransportModels \
+    -lthermophysicalTransportModels

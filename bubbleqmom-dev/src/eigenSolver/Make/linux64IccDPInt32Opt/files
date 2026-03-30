@@ -1,0 +1,3 @@
+SOURCE += eigenSolver.C
+
+LIB = $(FOAM_USER_LIBBIN)/libeigenSolver

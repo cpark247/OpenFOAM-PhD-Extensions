@@ -401,7 +401,13 @@ FodyWeavers.xsd
 *.sln.iml
 
 # OpenFOAM compilation
-linux*GCC*/*
+linux*GCC*
+linux*Gcc*
 *.dep
 *.o
-
+linux64GccDPInt32Opt
+linux64GccDPInt32Debug
+/bubbleqmom-dev/src/functionObjects/fieldAverageVelCyl_OF9_workingAndreas
+/bubbleqmom-dev/src/functionObjects/phaseModelledDissipation
+/bubbleqmom-dev/src/functionObjects/fieldAverageVelCyl
+/bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/phaseSystems/populationBalanceMomModel/daughterSizeDistributionModels

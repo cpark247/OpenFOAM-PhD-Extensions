@@ -1,0 +1,5 @@
+SOURCE += fieldSelection/fieldSelection.C
+SOURCE += fileFieldSelection/fileFieldSelection.C
+SOURCE += volFieldSelection/volFieldSelection.C
+
+LIB = $(FOAM_USER_LIBBIN)/libfieldSelection

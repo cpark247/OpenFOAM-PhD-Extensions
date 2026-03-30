@@ -1,0 +1,26 @@
+SOURCE += phaseSystemHaensch/phaseSystemHaensch.C
+SOURCE += phaseSystemHaensch/phaseSystemHaenschSolve.C
+
+SOURCE += BlendedInterfacialModel/blendingMethods/cfxBlending/cfxBlending.C
+
+SOURCE += diameterModels/qmomVelocity/qmomVelocity.C
+
+SOURCE += populationBalanceMomModel/populationBalanceMomModel/populationBalanceMomModel.C
+
+SOURCE += populationBalanceMomModel/coalescenceModels/coalescenceMomModel/coalescenceMomModel.C
+SOURCE += populationBalanceMomModel/coalescenceModels/constantCoalescenceMom/constantCoalescenceMom.C
+SOURCE += populationBalanceMomModel/coalescenceModels/hydrodynamicMom/hydrodynamicMom.C
+SOURCE += populationBalanceMomModel/coalescenceModels/PrinceBlanchMom/PrinceBlanchMom.C
+
+SOURCE += populationBalanceMomModel/breakupModels/breakupMomModel/breakupMomModel.C
+SOURCE += populationBalanceMomModel/breakupModels/exponentialMom/exponentialMom.C
+SOURCE += populationBalanceMomModel/breakupModels/LaakkonenMom/LaakkonenMom.C
+
+SOURCE += populationBalanceModel/coalescenceModels/PrinceBlanchForSAS2/PrinceBlanchForSAS2.C
+SOURCE += populationBalanceModel/binaryBreakupModels/LuoSvendsenForSAS2/LuoSvendsenForSAS2.C
+
+SOURCE += populationBalanceMomModel/daughterSizeDistributionModels/daughterSizeDistributionMomModel/daughterSizeDistributionMomModel.C
+SOURCE += populationBalanceMomModel/daughterSizeDistributionModels/uniformBinaryMom/uniformBinaryMom.C
+SOURCE += populationBalanceMomModel/daughterSizeDistributionModels/LaakkonenMomDaughterSizeDistribution/LaakkonenMomDaughterSizeDistribution.C
+
+LIB = $(FOAM_USER_LIBBIN)/libphaseSystemExtend

@@ -1,0 +1,5 @@
+SOURCE += fieldMomentInversion/fieldMomentInversion.C
+SOURCE += fieldMomentInversion/newFieldMomentInversion.C
+SOURCE += basicFieldMomentInversion/basicFieldMomentInversion.C
+
+LIB = $(FOAM_USER_LIBBIN)/libfieldMomentInversion

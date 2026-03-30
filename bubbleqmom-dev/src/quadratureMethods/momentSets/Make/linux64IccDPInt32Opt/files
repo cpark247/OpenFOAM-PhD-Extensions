@@ -1,0 +1,5 @@
+SOURCE += momentSet/momentSet.C
+SOURCE += univariateMomentSet/univariateMomentSet.C
+SOURCE += multivariateMomentSet/multivariateMomentSet.C
+
+LIB = $(FOAM_USER_LIBBIN)/libmomentSets

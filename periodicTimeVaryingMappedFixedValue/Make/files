@@ -1,0 +1,4 @@
+periodicTimeVaryingMappedFvPatchField/periodicTimeVaryingMapped.C
+periodicTimeVaryingMappedFixedValueFvPatchFields.C
+
+LIB = $(FOAM_USER_LIBBIN)/libPeriodicMap

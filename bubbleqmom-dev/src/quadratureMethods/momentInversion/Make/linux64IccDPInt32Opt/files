@@ -1,0 +1,5 @@
+SOURCE += univariate/basic/univariateMomentInversion/univariateMomentInversion.C
+SOURCE += univariate/basic/univariateMomentInversion/newUnivariateMomentInversion.C
+SOURCE += univariate/basic/gaussMomentInversion/gaussMomentInversion.C
+
+LIB = $(FOAM_USER_LIBBIN)/libmomentInversion

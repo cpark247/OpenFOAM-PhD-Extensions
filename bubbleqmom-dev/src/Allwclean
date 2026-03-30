@@ -1,0 +1,39 @@
+#!/bin/sh
+cd ${0%/*} || exit 1    # run from this directory
+set -x
+
+wclean functionObjects/fieldAverageVelCyl_OF9_working/
+
+#wclean libso TurbulenceModels/incompressible
+#wclean libso TurbulenceModels/incompressible/turbulentTransportModels/derivedFvPatchFields/wallFunctions
+#wclean libso TurbulenceModels/compressible
+wclean eigenSolver
+wclean Vandermonde
+wclean quadratureMethods/momentSets
+wclean quadratureMethods/momentInversion
+#wclean libso quadratureMethods/hermiteQuadrature
+#wclean libso quadratureMethods/quadratureNode
+wclean quadratureMethods/fieldMomentInversion
+wclean quadratureMethods/quadratureApproximations
+#wclean libso quadratureMethods/momentAdvection
+wclean functionObjects/alphaSum
+wclean functionObjects/field/stabilityBlendingFactor
+wclean functionObjects/fieldAverageVelCyl
+wclean functionObjects/phaseResolvedDissipationFluc
+wclean surfaceInterpolation
+
+wclean finiteVolume/functionObjects/fieldSelections
+wclean meshTools/meshStructureGI
+wclean functionObjects/field/columnSum
+wclean MomentumTransportModels/phaseCompressible
+#wclean libso opticalModel
+#wclean libso functionObjects/schlierenFunctionObject
+#wclean libso quadratureMethods/PDFTransportModels
+#wclean libso quadratureMethods/populationBalanceModels
+#wclean libso quadratureMethods/mixingModels
+
+wclean finiteVolume
+rm -r meshTools/interpolateData/nearestNeighbour/lib
+wclean meshTools/interpolateData/patchInterpolate
+
+# ----------------------------------------------------------------- end-of-file

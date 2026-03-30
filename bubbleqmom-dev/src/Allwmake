@@ -1,0 +1,39 @@
+#!/bin/sh
+cd ${0%/*} || exit 1    # run from this directory
+set -x
+
+wmake functionObjects/fieldAverageVelCyl_OF9_workingAndreas/ 
+
+#wmake libso TurbulenceModels/incompressible
+#wmake libso TurbulenceModels/incompressible/turbulentTransportModels/derivedFvPatchFields/wallFunctions
+#wmake libso TurbulenceModels/compressible
+wmake eigenSolver
+wmake Vandermonde
+wmake quadratureMethods/momentSets
+wmake quadratureMethods/momentInversion
+#wmake libso quadratureMethods/hermiteQuadrature
+#wmake libso quadratureMethods/quadratureNode
+wmake quadratureMethods/fieldMomentInversion
+wmake quadratureMethods/quadratureApproximations
+#wmake libso quadratureMethods/momentAdvection
+wmake functionObjects/alphaSum
+wmake functionObjects/field/stabilityBlendingFactor
+wmake functionObjects/fieldAverageVelCyl
+wmake functionObjects/phaseResolvedDissipationFluc
+wmake surfaceInterpolation
+
+wmake finiteVolume/functionObjects/fieldSelections
+wmake meshTools/meshStructureGI
+wmake functionObjects/field/columnSum
+wmake MomentumTransportModels/phaseCompressible
+#wmake libso opticalModel
+#wmake libso functionObjects/schlierenFunctionObject
+#wmake libso quadratureMethods/PDFTransportModels
+#wmake libso quadratureMethods/mixingModels
+#wmake libso quadratureMethods/populationBalanceModels
+wmake -all meshTools
+# adpt, when adding other functionalities to finiteVolume
+if [ "$BUILD_WITH_ULF" == "true" ]; then
+  wmake libso finiteVolume/
+fi
+# ----------------------------------------------------------------- end-of-file

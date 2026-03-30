@@ -1,0 +1,6 @@
+SOURCE += momentGenerationModel/momentGenerationModel.C
+SOURCE += momentGenerationModel/newMomentGenerationModel.C
+
+SOURCE += alphaAndDiameter/alphaAndDiameter.C
+
+LIB = $(FOAM_USER_LIBBIN)/libmomentGenerationModels

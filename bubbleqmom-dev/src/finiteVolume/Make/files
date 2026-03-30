@@ -1,0 +1,8 @@
+fvPatchFields = fields/fvPatchFields
+derivedFvPatchFields = $(fvPatchFields)/derived
+
+$(FLAMELETCONFIG_DIR)/src/pmmap.c
+$(derivedFvPatchFields)/myTimeVaryingMappedFixedValue/myTimeVaryingMappedFixedValueFvPatchFields.C
+
+LIB = $(FOAM_USER_LIBBIN)/libadditionalFiniteVolume
+

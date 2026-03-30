@@ -1,0 +1,4 @@
+LESfilterNSteps/LESfilterNSteps.C
+momentsTruncFilter/momentsTruncFilter.C
+
+LIB = $(FOAM_USER_LIBBIN)/libLESfiltersNSteps

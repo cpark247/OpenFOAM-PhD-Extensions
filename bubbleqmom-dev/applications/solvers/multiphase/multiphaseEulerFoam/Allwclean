@@ -1,0 +1,12 @@
+#!/bin/sh
+echo 'ere'
+cd ${0%/*} || exit 1    # Run from this directory
+
+wclean libso phaseSystems
+wclean libso interfacialModels
+wclean libso interfacialCompositionModels
+
+wclean multiphaseCompressibleMomentumTransportModels/multiphaseCompressibleMomentumTransportModelsExtend.C
+multiphaseEulerFoam/Allwclean
+
+#------------------------------------------------------------------------------

@@ -1,0 +1,3 @@
+SOURCE += meshStructureGI.C
+
+LIB = $(FOAM_USER_LIBBIN)/libmeshStructureGI

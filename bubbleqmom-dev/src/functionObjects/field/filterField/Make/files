@@ -1,0 +1,3 @@
+filterField.C
+
+LIB = $(FOAM_USER_LIBBIN)/libfilterField

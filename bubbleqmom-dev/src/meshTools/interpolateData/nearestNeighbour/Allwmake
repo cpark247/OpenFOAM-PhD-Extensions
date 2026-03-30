@@ -1,0 +1,15 @@
+#!/bin/bash
+
+mkdir -p lib
+cd lib
+
+cmake ../include
+
+make
+
+cp --remove-destination libnearestNeighbour.so $FOAM_USER_LIBBIN
+
+#if [ ! -h  $FOAM_USER_LIBBIN/libnearestNeighbour.so ]
+#then
+#    ln -s $PWD/libnearestNeighbour.so $FOAM_USER_LIBBIN/libnearestNeighbour.so 
+#fi

@@ -1,0 +1,465 @@
+diff -r ./Allwclean /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/Allwclean
+5c5
+< #wclean
+---
+> wclean
+diff -r ./Allwmake /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/Allwmake
+8c8
+< #wmake $targetType
+---
+> wmake $targetType
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: CourantNo.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: createFieldRefs.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: createFields.H
+Only in .: Difflog
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: EEqns.H
+diff -r ./Make/files /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/Make/files
+1c1
+< multiphaseEulerFoamHSM.C
+---
+> multiphaseEulerFoam.C
+3c3
+< EXE = $(FOAM_USER_APPBIN)/multiphaseEulerFoamHSM
+---
+> EXE = $(FOAM_APPBIN)/multiphaseEulerFoam
+Only in ./Make: linux64GccDPInt32Opt
+Only in ./Make: linux64IccDPInt32Opt
+diff -r ./Make/options /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/Make/options
+1a2
+>     -I../include \
+3,7c4,5
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/include \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/phaseSystems/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/interfacialModels/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/interfacialCompositionModels/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/ \
+---
+>     -I../interfacialModels/lnInclude \
+>     -I../interfacialCompositionModels/lnInclude \
+15,24c13
+<     -I$(LIB_SRC)/dynamicFvMesh/lnInclude \
+<     -I../../../../../src/quadratureMethods/momentSets/lnInclude \
+<     -I../../../../../src/quadratureMethods/momentInversion/lnInclude \
+<     -I../../../../../src/quadratureMethods/quadratureNode/lnInclude \
+<     -I../../../../../src/quadratureMethods/moments \
+<     -I../../../../../src/quadratureMethods/fieldMomentInversion/lnInclude \
+<     -I../../../../../src/quadratureMethods/quadratureApproximations/lnInclude \
+<     -I../../../../../src/Vandermonde/lnInclude \
+<     -I../../../../../src/mappedList \
+<     -I../../../../../src/mappedPtrList
+---
+>     -I$(LIB_SRC)/dynamicFvMesh/lnInclude
+27,28d15
+<     -L$(FOAM_USER_LIBBIN) \
+<     -lphaseSystemExtend \
+30c17
+<     -lmultiphaseSystemsExtend \
+---
+>     -lmultiphaseSystems \
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: multiphaseEulerFoam.C
+Only in .: multiphaseEulerFoamCoNum.C
+Only in .: multiphaseEulerFoamHSM.C
+diff -r ./multiphaseSystems/lnInclude/multiphaseSystems.C /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/multiphaseSystems/lnInclude/multiphaseSystems.C
+5c5
+<     \\  /    A nd           | Copyright (C) 2015-2020 OpenFOAM Foundation
+---
+>     \\  /    A nd           | Copyright (C) 2015-2021 OpenFOAM Foundation
+27d26
+< #include "phaseSystemHaensch.H"
+29d27
+< #include "MomentumTransferPhaseSystemExtend.H"
+35d32
+< #include "PopulationBalanceMomPhaseSystem.H"
+49c46
+<                 MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                 MomentumTransferPhaseSystem<phaseSystem>
+52c49
+<         basicMultiphaseSystemHaensch;
+---
+>         basicMultiphaseSystem;
+57c54
+<         basicMultiphaseSystemHaensch,
+---
+>         basicMultiphaseSystem,
+59c56
+<         basicMultiphaseSystemHaensch
+---
+>         basicMultiphaseSystem
+63c60
+<         PopulationBalancePhaseSystem
+---
+>         InterfaceCompositionPhaseChangePhaseSystem
+67c64
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 TwoResistanceHeatTransferPhaseSystem
+69c66
+<                     MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                     MomentumTransferPhaseSystem<phaseSystem>
+73c70
+<         populationBalanceMultiphaseSystemHaensch;
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem;
+78c75
+<         populationBalanceMultiphaseSystemHaensch,
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem,
+80c77
+<         populationBalanceMultiphaseSystemHaensch
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem
+84,102c81
+<         PhaseTransferPhaseSystem
+<         <
+<             OneResistanceHeatTransferPhaseSystem
+<             <
+<                 MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+<             >
+<         >
+<         basicMultiphaseSystemHaenschExtend;
+< 
+<     addNamedToRunTimeSelectionTable
+<     (
+<         phaseSystem,
+<         basicMultiphaseSystemHaenschExtend,
+<         dictionary,
+<         basicMultiphaseSystemHaenschExtend
+<     );
+< 
+<     typedef
+<         PopulationBalancePhaseSystem
+---
+>         ThermalPhaseChangePhaseSystem
+106c85
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 TwoResistanceHeatTransferPhaseSystem
+108c87
+<                     MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+---
+>                     MomentumTransferPhaseSystem<phaseSystem>
+112c91
+<         populationBalanceMultiphaseSystemHaenschExtend;
+---
+>         thermalPhaseChangeMultiphaseSystem;
+117c96
+<         populationBalanceMultiphaseSystemHaenschExtend,
+---
+>         thermalPhaseChangeMultiphaseSystem,
+119c98
+<         populationBalanceMultiphaseSystemHaenschExtend
+---
+>         thermalPhaseChangeMultiphaseSystem
+123c102
+<         PopulationBalanceMomPhaseSystem
+---
+>         PopulationBalancePhaseSystem
+133c112
+<         populationBalanceMomMultiphaseSystem;
+---
+>         populationBalanceMultiphaseSystem;
+138c117
+<         populationBalanceMomMultiphaseSystem,
+---
+>         populationBalanceMultiphaseSystem,
+140c119
+<         populationBalanceMomMultiphaseSystem
+---
+>         populationBalanceMultiphaseSystem
+144c123
+<         PopulationBalanceMomPhaseSystem
+---
+>         InterfaceCompositionPhaseChangePhaseSystem
+146c125
+<             PhaseTransferPhaseSystem
+---
+>             PopulationBalancePhaseSystem
+148c127
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 PhaseTransferPhaseSystem
+150c129,132
+<                     MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                     TwoResistanceHeatTransferPhaseSystem
+>                     <
+>                         MomentumTransferPhaseSystem<phaseSystem>
+>                     >
+154c136
+<         populationBalanceMomMultiphaseSystemHaensch;
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem;
+159c141
+<         populationBalanceMomMultiphaseSystemHaensch,
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem,
+161c143
+<         populationBalanceMomMultiphaseSystemHaensch
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem
+165c147
+<         PopulationBalanceMomPhaseSystem
+---
+>         ThermalPhaseChangePhaseSystem
+167c149
+<             PhaseTransferPhaseSystem
+---
+>             PopulationBalancePhaseSystem
+169c151
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 PhaseTransferPhaseSystem
+171c153,156
+<                     MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+---
+>                     TwoResistanceHeatTransferPhaseSystem
+>                     <
+>                         MomentumTransferPhaseSystem<phaseSystem>
+>                     >
+175c160
+<         populationBalanceMomMultiphaseSystemHaenschExtend;
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem;
+180c165
+<         populationBalanceMomMultiphaseSystemHaenschExtend,
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem,
+182c167
+<         populationBalanceMomMultiphaseSystemHaenschExtend
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem
+184,187d168
+<     
+< 
+< 
+< 
+188a170
+> 
+diff -r ./multiphaseSystems/Make/files /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/multiphaseSystems/Make/files
+3c3
+< LIB = $(FOAM_USER_LIBBIN)/libmultiphaseSystemsExtend
+---
+> LIB = $(FOAM_LIBBIN)/libmultiphaseSystems
+Only in ./multiphaseSystems/Make: linux64GccDPInt32Opt
+Only in ./multiphaseSystems/Make: linux64IccDPInt32Opt
+diff -r ./multiphaseSystems/Make/options /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/multiphaseSystems/Make/options
+1a2,3
+>     -I../../interfacialModels/lnInclude \
+>     -I../../interfacialCompositionModels/lnInclude \
+3,6c5
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/interfacialModels/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/phaseSystems/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/interfacialCompositionModels/lnInclude \
+<     -I$(FOAM_SOLVERS)/multiphase/multiphaseEulerFoam/multiphaseCompressibleMomentumTransportModels/lnInclude \
+---
+>     -I../../multiphaseCompressibleMomentumTransportModels/lnInclude \
+17,26c16
+<     -I$(LIB_SRC)/sampling/lnInclude \
+<     -I../../../../../../src/quadratureMethods/momentSets/lnInclude \
+<     -I../../../../../../src/quadratureMethods/momentInversion/lnInclude \
+<     -I../../../../../../src/quadratureMethods/quadratureNode/lnInclude \
+<     -I../../../../../../src/quadratureMethods/moments \
+<     -I../../../../../../src/quadratureMethods/quadratureApproximations/lnInclude \
+<     -I../../../../../../src/quadratureMethods/fieldMomentInversion/lnInclude \
+<     -I../../../../../../src/Vandermonde/lnInclude \
+<     -I../../../../../../src/mappedList \
+<     -I../../../../../../src/mappedPtrList
+---
+>     -I$(LIB_SRC)/sampling/lnInclude
+29d18
+<     -L$(FOAM_USER_LIBBIN) -lphaseSystemExtend \
+31,34c20
+<     -lmomentSets \
+<     -lquadratureApproximation \
+<     -lfieldMomentInversion \
+<     -lvandermonde
+---
+>     -lphaseSystem
+Only in ./multiphaseSystems/Make: options.ori
+diff -r ./multiphaseSystems/multiphaseSystems.C /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/multiphaseSystems/multiphaseSystems.C
+5c5
+<     \\  /    A nd           | Copyright (C) 2015-2020 OpenFOAM Foundation
+---
+>     \\  /    A nd           | Copyright (C) 2015-2021 OpenFOAM Foundation
+27d26
+< #include "phaseSystemHaensch.H"
+29d27
+< #include "MomentumTransferPhaseSystemExtend.H"
+35d32
+< #include "PopulationBalanceMomPhaseSystem.H"
+49c46
+<                 MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                 MomentumTransferPhaseSystem<phaseSystem>
+52c49
+<         basicMultiphaseSystemHaensch;
+---
+>         basicMultiphaseSystem;
+57c54
+<         basicMultiphaseSystemHaensch,
+---
+>         basicMultiphaseSystem,
+59c56
+<         basicMultiphaseSystemHaensch
+---
+>         basicMultiphaseSystem
+63c60
+<         PopulationBalancePhaseSystem
+---
+>         InterfaceCompositionPhaseChangePhaseSystem
+67c64
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 TwoResistanceHeatTransferPhaseSystem
+69c66
+<                     MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                     MomentumTransferPhaseSystem<phaseSystem>
+73c70
+<         populationBalanceMultiphaseSystemHaensch;
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem;
+78c75
+<         populationBalanceMultiphaseSystemHaensch,
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem,
+80c77
+<         populationBalanceMultiphaseSystemHaensch
+---
+>         interfaceCompositionPhaseChangeMultiphaseSystem
+84,102c81
+<         PhaseTransferPhaseSystem
+<         <
+<             OneResistanceHeatTransferPhaseSystem
+<             <
+<                 MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+<             >
+<         >
+<         basicMultiphaseSystemHaenschExtend;
+< 
+<     addNamedToRunTimeSelectionTable
+<     (
+<         phaseSystem,
+<         basicMultiphaseSystemHaenschExtend,
+<         dictionary,
+<         basicMultiphaseSystemHaenschExtend
+<     );
+< 
+<     typedef
+<         PopulationBalancePhaseSystem
+---
+>         ThermalPhaseChangePhaseSystem
+106c85
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 TwoResistanceHeatTransferPhaseSystem
+108c87
+<                     MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+---
+>                     MomentumTransferPhaseSystem<phaseSystem>
+112c91
+<         populationBalanceMultiphaseSystemHaenschExtend;
+---
+>         thermalPhaseChangeMultiphaseSystem;
+117c96
+<         populationBalanceMultiphaseSystemHaenschExtend,
+---
+>         thermalPhaseChangeMultiphaseSystem,
+119c98
+<         populationBalanceMultiphaseSystemHaenschExtend
+---
+>         thermalPhaseChangeMultiphaseSystem
+123c102
+<         PopulationBalanceMomPhaseSystem
+---
+>         PopulationBalancePhaseSystem
+133c112
+<         populationBalanceMomMultiphaseSystem;
+---
+>         populationBalanceMultiphaseSystem;
+138c117
+<         populationBalanceMomMultiphaseSystem,
+---
+>         populationBalanceMultiphaseSystem,
+140c119
+<         populationBalanceMomMultiphaseSystem
+---
+>         populationBalanceMultiphaseSystem
+144c123
+<         PopulationBalanceMomPhaseSystem
+---
+>         InterfaceCompositionPhaseChangePhaseSystem
+146c125
+<             PhaseTransferPhaseSystem
+---
+>             PopulationBalancePhaseSystem
+148c127
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 PhaseTransferPhaseSystem
+150c129,132
+<                     MomentumTransferPhaseSystem<phaseSystemHaensch>
+---
+>                     TwoResistanceHeatTransferPhaseSystem
+>                     <
+>                         MomentumTransferPhaseSystem<phaseSystem>
+>                     >
+154c136
+<         populationBalanceMomMultiphaseSystemHaensch;
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem;
+159c141
+<         populationBalanceMomMultiphaseSystemHaensch,
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem,
+161c143
+<         populationBalanceMomMultiphaseSystemHaensch
+---
+>         interfaceCompositionPhaseChangePopulationBalanceMultiphaseSystem
+165c147
+<         PopulationBalanceMomPhaseSystem
+---
+>         ThermalPhaseChangePhaseSystem
+167c149
+<             PhaseTransferPhaseSystem
+---
+>             PopulationBalancePhaseSystem
+169c151
+<                 OneResistanceHeatTransferPhaseSystem
+---
+>                 PhaseTransferPhaseSystem
+171c153,156
+<                     MomentumTransferPhaseSystemExtend<phaseSystemHaensch>
+---
+>                     TwoResistanceHeatTransferPhaseSystem
+>                     <
+>                         MomentumTransferPhaseSystem<phaseSystem>
+>                     >
+175c160
+<         populationBalanceMomMultiphaseSystemHaenschExtend;
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem;
+180c165
+<         populationBalanceMomMultiphaseSystemHaenschExtend,
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem,
+182c167
+<         populationBalanceMomMultiphaseSystemHaenschExtend
+---
+>         thermalPhaseChangePopulationBalanceMultiphaseSystem
+184,187d168
+<     
+< 
+< 
+< 
+188a170
+> 
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: pEqnComps.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/pU: pEqn.H
+Only in ./pU: pEqnRelax.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/pU: UEqns.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: pUf
+Only in .: setDeltaTCoNum.H
+Only in /hsmstorage/software/openFoam/OpenFOAM-9/applications/solvers/multiphase/multiphaseEulerFoam/multiphaseEulerFoam/: YEqns.H

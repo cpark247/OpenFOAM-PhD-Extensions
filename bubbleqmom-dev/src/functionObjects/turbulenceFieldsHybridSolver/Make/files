@@ -1,0 +1,3 @@
+turbulenceFieldsHybridSolver.C
+
+LIB = $(FOAM_USER_LIBBIN)/libturbulenceFieldsHybridSolverFunctionObject

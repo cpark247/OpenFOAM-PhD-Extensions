@@ -1,0 +1,57 @@
+/*--------------------------------*- C++ -*----------------------------------*\
+| =========                 |                                                 |
+| \\      /  F ield         | OpenFOAM: The Open Source CFD Toolbox           |
+|  \\    /   O peration     | Version:  v2406                                 |
+|   \\  /    A nd           | Website:  www.openfoam.com                      |
+|    \\/     M anipulation  |                                                 |
+\*---------------------------------------------------------------------------*/
+FoamFile
+{
+    version     2.0;
+    format      ascii;
+    class       dictionary;
+    object      perturbUDict;
+}
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// Friction Reynolds number
+Retau           180;
+
+// Duct half-height (distance from center to wall)
+h               0.05;  // 5 cm half-height = 10 cm total height
+
+// Center of the duct in the height direction (y)
+// If your duct extends from y=0.1 to y=0.2, then yMid = 0.15
+yMid            0.05;  // Duct centered at y = 0.05 (extends from 0 to 0.1)
+
+// Center of the duct in the spanwise direction (z)
+// If your duct extends from z=0.1 to z=0.2, then zMid = 0.15
+zMid            0.05;  // Duct centered at z = 0.05 (extends from 0 to 0.1)
+
+// Set bulk velocity profile (Fourier series solution for duct flow)
+setBulk         true;
+
+// Add perturbations to trigger transition
+perturb         true;
+
+// Flow directions (0=x, 1=y, 2=z)
+streamwise      0;  // x-direction is streamwise (main flow)
+spanwise        2;  // z-direction is spanwise
+
+// * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
+
+// EXAMPLES FOR DIFFERENT GEOMETRIES:
+// 
+// Example 1: Duct from y∈[0, 0.1] and z∈[0, 0.1]
+//   h = 0.05, yMid = 0.05, zMid = 0.05
+//
+// Example 2: Duct from y∈[0.5, 1.5] and z∈[0.2, 1.2]
+//   h = 0.5, yMid = 1.0, zMid = 0.7
+//
+// Example 3: Duct centered at origin from y∈[-0.05, 0.05] and z∈[-0.05, 0.05]
+//   h = 0.05, yMid = 0.0, zMid = 0.0
+//
+// BACKWARD COMPATIBILITY:
+// If yMid and zMid are not specified, they default to h (original behavior)
+
+// ************************************************************************* //

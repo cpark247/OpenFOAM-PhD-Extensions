@@ -1,0 +1,4 @@
+$(FLAMELETCONFIG_DIR)/src/pmmap.c
+patchInterpolateFE40.C
+
+LIB = $(FOAM_USER_LIBBIN)/libpatchInterpolateFE40
