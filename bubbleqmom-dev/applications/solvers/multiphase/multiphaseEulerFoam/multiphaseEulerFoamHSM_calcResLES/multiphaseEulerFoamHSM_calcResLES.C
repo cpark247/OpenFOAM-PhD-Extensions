@@ -229,6 +229,11 @@ int main(int argc, char *argv[])
     // LES constants
     const scalar C_k = 0.094;
 
+    // CAlpha (Hänsch) constants — independent of the CBeta alphaMin/alphaMax
+    const scalar a_b   = 35.0;   // steepness of the tanh transitions
+    const dimensionedScalar a_min_H("a_min_H", dimless, 0.1);  // lower threshold
+    const dimensionedScalar a_max_H("a_max_H", dimless, 0.9);  // upper threshold
+
     // Calculate LES delta field once (mesh-dependent, doesn't change during simulation)
     volScalarField delta_LES
     (
@@ -382,6 +387,20 @@ int main(int argc, char *argv[])
             // Calculate phase fluctuating velocity (ASSIGN, do not declare)
             UPrime_[phasei] = U_phase - UMean_[phasei];
 
+            // Alpha statistics — all phases
+            const volScalarField& alpha_phase = phases[phasei];
+            averager.updateAverage(alphaMean_[phasei], alpha_phase, currentDeltaT);
+            const volScalarField alphaSqInst(alpha_phase * alpha_phase);
+            averager.updateAverage(alphaSqMean_[phasei], alphaSqInst, currentDeltaT);
+            alphaRMS_[phasei] = Foam::sqrt
+            (
+                max
+                (
+                    alphaSqMean_[phasei] - Foam::sqr(alphaMean_[phasei]),
+                    dimensionedScalar("zero", dimless, 0.0)
+                )
+            );
+
             // Try to access turbulence fields for this phase
             const word kFieldName       = "k."       + phaseName;
             const word nutFieldName     = "nut."     + phaseName;
@@ -389,10 +408,6 @@ int main(int argc, char *argv[])
 
             if (phases[phasei].name() == "air")
             {
-                // Get phase fraction as volScalarField
-                const volScalarField& alpha_phase = phases[phasei];
-                averager.updateAverage(alphaMean_[phasei], alpha_phase, currentDeltaT);
-
                 // Isovolume fields
                 isoVol_80 = pos(alpha_phase - 0.8);
                 isoVol_90 = pos(alpha_phase - 0.9);
@@ -411,6 +426,20 @@ int main(int argc, char *argv[])
 
                 // Update time-averaged CBeta
                 averager.updateAverage(CBeta_Mean_, CBeta, currentDeltaT);
+
+                // CAlpha: Hänsch hyperbolic-tangent morphology blending function
+                // Bell-shaped product of two smooth step functions:
+                //   factor1 = 0.5*tanh(a_b*(alpha - a_min)) + 0.5   (rises at a_min)
+                //   factor2 = 0.5*tanh(a_b*(a_max  - alpha)) + 0.5  (falls at a_max)
+                // CAlpha ≈ 0 for alpha << a_min (dispersed/EE)
+                // CAlpha ≈ 1 for a_min << alpha << a_max (large gas pockets / SIM)
+                // CAlpha ≈ 0 for alpha >> a_max (near-pure gas, inverted dispersed)
+                CAlpha =
+                    (scalar(0.5)*Foam::tanh(a_b*(alpha_phase - a_min_H)) + scalar(0.5))
+                   *(scalar(0.5)*Foam::tanh(a_b*(a_max_H - alpha_phase)) + scalar(0.5));
+
+                // Update time-averaged CAlpha
+                averager.updateAverage(CAlpha_Mean_, CAlpha, currentDeltaT);
             }
             else // water phase
             {

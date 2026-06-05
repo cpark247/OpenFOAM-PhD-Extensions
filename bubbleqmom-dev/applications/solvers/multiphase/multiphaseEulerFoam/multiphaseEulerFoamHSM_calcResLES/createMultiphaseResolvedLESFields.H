@@ -55,6 +55,8 @@ PtrList<volVectorField> UPrime_(phases.size());
 // MIXTURE PROPERTIES (MEAN)
 // ============================================================================
 PtrList<volScalarField> alphaMean_(nPhases);
+PtrList<volScalarField> alphaSqMean_(nPhases);  // <alpha^2>
+PtrList<volScalarField> alphaRMS_(nPhases);     // sqrt(<alpha^2> - <alpha>^2)
 
 // ============================================================================
 // MODELLED/SGS FIELDS (INSTANTANEOUS) PER PHASE
@@ -153,6 +155,61 @@ forAll(phases, phasei)
             ),
             mesh,
             dimensionedVector("zero", dimVelocity, vector::zero)
+        )
+    );
+
+    // ---- alphaMean_[phasei] (all phases)
+    alphaMean_.set
+    (
+        phasei,
+        new volScalarField
+        (
+            IOobject
+            (
+                "alpha." + phaseName + "_Mean",
+                runTime.timeName(),
+                mesh,
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            phases[phasei]
+        )
+    );
+
+    // ---- alphaSqMean_[phasei] (all phases): time-average of alpha^2
+    alphaSqMean_.set
+    (
+        phasei,
+        new volScalarField
+        (
+            IOobject
+            (
+                "alphaSq." + phaseName + "_Mean",
+                runTime.timeName(),
+                mesh,
+                IOobject::READ_IF_PRESENT,
+                IOobject::AUTO_WRITE
+            ),
+            phases[phasei] * phases[phasei]
+        )
+    );
+
+    // ---- alphaRMS_[phasei] (all phases): sqrt(<alpha^2> - <alpha>^2)
+    alphaRMS_.set
+    (
+        phasei,
+        new volScalarField
+        (
+            IOobject
+            (
+                "alpha." + phaseName + "_RMS",
+                runTime.timeName(),
+                mesh,
+                IOobject::NO_READ,
+                IOobject::AUTO_WRITE
+            ),
+            mesh,
+            dimensionedScalar("alphaRMS", dimless, 0.0)
         )
     );
 
@@ -636,25 +693,6 @@ forAll(phases, phasei)
             )
         );
     }
-    else // air phase
-    {
-        alphaMean_.set
-        (
-            phasei,
-            new volScalarField
-            (
-                IOobject
-                (
-                    "alpha." + phaseName + "_Mean",
-                    runTime.timeName(),
-                    mesh,
-                    IOobject::READ_IF_PRESENT,
-                    IOobject::AUTO_WRITE
-                ),
-                phases[phasei]
-            )
-        );
-    }
 }
 
 // ============================================================================
@@ -702,7 +740,10 @@ volScalarField isoVol_95
     dimensionedScalar("isoVol_95", dimless, 0.0)
 );
 
-// ---- CBeta (air)
+// ---- CBeta (air): EE drag correction factor
+//      = 1 in the dispersed (EE) regime (alpha <= alphaMax)
+//      -> 0 as alpha -> 1 (no EE drag in pure gas / SIM regime)
+//      Formula: min(1, max(alphaMin/alpha, alphaMax*(1-alpha)/((1-alphaMax)*alpha)))
 volScalarField CBeta
 (
     IOobject
@@ -728,6 +769,38 @@ volScalarField CBeta_Mean_
         IOobject::AUTO_WRITE
     ),
     CBeta
+);
+
+// ---- CAlpha (air): Hänsch hyperbolic-tangent morphology blending function
+//      Bell-shaped: peaks at 1 for intermediate alpha (large resolved gas pockets / SIM),
+//      falls to 0 for both very small alpha (bubbly / EE) and very large alpha (near-pure gas).
+//      Formula: [0.5*tanh(a_b*(alpha-a_min))+0.5] * [0.5*tanh(a_b*(a_max-alpha))+0.5]
+//      Constants: a_b = 35, a_min = 0.1, a_max = 0.9
+volScalarField CAlpha
+(
+    IOobject
+    (
+        "CAlpha",
+        runTime.timeName(),
+        mesh,
+        IOobject::NO_READ,
+        IOobject::NO_WRITE
+    ),
+    mesh,
+    dimensionedScalar("CAlpha", dimless, 0.0)
+);
+
+volScalarField CAlpha_Mean_
+(
+    IOobject
+    (
+        "CAlpha_Mean_",
+        runTime.timeName(),
+        mesh,
+        IOobject::READ_IF_PRESENT,
+        IOobject::AUTO_WRITE
+    ),
+    CAlpha
 );
 
 volScalarField d_32

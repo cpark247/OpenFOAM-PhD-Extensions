@@ -70,14 +70,9 @@ PrinceBlanchForSST
             popBal_.mesh(),
             IOobject::NO_READ,
             IOobject::AUTO_WRITE
-	),
+        ),
         popBal_.mesh(),
-        dimensionedScalar
-        (
-            "CPack",
-            dimless,
-            Zero
-        )
+        dimensionedScalar("CPack", dimless, Zero)
     ),
     CPackMax_
     (
@@ -91,29 +86,97 @@ PrinceBlanchForSST
     laminarShearCollisions_(dict.lookup("laminarShearCollisions")),
     coalescenceRate_
     (
-         IOobject
-         (
-            "coalescenceRate_",
-             popBal_.time().timeName(),
-             popBal_.mesh(),
-             IOobject::NO_READ,
-             IOobject::AUTO_WRITE
-         ),
-         popBal_.mesh(),
-         dimensionedScalar
-         (
-            "coalescenceRate_",
-            dimVolume/dimTime,
-            Zero
-         )
-    )
-
+        IOobject
+        (
+            "coalescenceRateTotal",     // FIX: was "coalescenceRate_"
+            popBal_.time().timeName(),
+            popBal_.mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        popBal_.mesh(),
+        dimensionedScalar("coalescenceRateTotal", dimVolume/dimTime, Zero)
+    ),
+    coalescenceRates_(),
+    ratesInitialized_(false),
+    lastResetTimeIndex_(-1)
 {
-    Info << "PrinceBlanchForSST()" << endl;
+    Info << "PrinceBlanchForSST(): Initializing coalescence model" << endl;
+    Info << "    PMax = " << PMax_.value() << endl;
+    Info << "    CPackMax = " << CPackMax_.value() << endl;
+    Info << "    C1 = " << C1_.value() << endl;
+    Info << "    h0 = " << h0_.value() << endl;
+    Info << "    hf = " << hf_.value() << endl;
+    Info << "    turbulentCollisions = " << turbulentCollisions_ << endl;
+    Info << "    buoyantCollisions = " << buoyantCollisions_ << endl;
+    Info << "    laminarShearCollisions = " << laminarShearCollisions_ << endl;
 }
 
 
 // * * * * * * * * * * * * * * * Member Functions  * * * * * * * * * * * * * //
+
+void Foam::diameterModels::coalescenceModels::PrinceBlanchForSST::precompute()
+{
+    // FIX: initialize per-class fields on first call
+    if (!ratesInitialized_)
+    {
+        const label nSizeGroups = popBal_.sizeGroups().size();
+
+        Info << "PrinceBlanchForSST::precompute(): Initializing "
+             << nSizeGroups << " per-class coalescence rate fields" << endl;
+
+        coalescenceRates_.setSize(nSizeGroups);
+
+        forAll(popBal_.sizeGroups(), i)
+        {
+            const sizeGroup& fi = popBal_.sizeGroups()[i];
+
+            word fieldName = "coalescenceRate_" + fi.name();
+
+            coalescenceRates_.set
+            (
+                i,
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        fieldName,
+                        popBal_.time().timeName(),
+                        popBal_.mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    popBal_.mesh(),
+                    dimensionedScalar(fieldName, dimVolume/dimTime, Zero)
+                )
+            );
+        }
+
+        ratesInitialized_ = true;
+    }
+
+    // FIX: reset rate fields once per timestep
+    const label currentTimeIndex = popBal_.mesh().time().timeIndex();
+
+    if (currentTimeIndex != lastResetTimeIndex_)
+    {
+        coalescenceRate_ = dimensionedScalar
+        (
+            "zero", coalescenceRate_.dimensions(), Zero
+        );
+
+        forAll(coalescenceRates_, i)
+        {
+            coalescenceRates_[i] = dimensionedScalar
+            (
+                "zero", coalescenceRates_[i].dimensions(), Zero
+            );
+        }
+
+        lastResetTimeIndex_ = currentTimeIndex;
+    }
+}
+
 
 void Foam::diameterModels::coalescenceModels::PrinceBlanchForSST::
 addToCoalescenceRate
@@ -130,29 +193,16 @@ addToCoalescenceRate
         popBal_.mesh().lookupObject<uniformDimensionedVectorField>("g");
 
     const dimensionedScalar rij(1/(1/fi.dSph() + 1/fj.dSph()));
-    //Info << "PrinceBlanchForSST()::addToCoalescenceRate" << endl;
-//********************************* HSM Addon **************************//
-    CPack_ = pos0(popBal_.alphas() - PMax_) * min(sqr(1/max(1 - popBal_.alphas(), SMALL)), CPackMax_) + neg(popBal_.alphas() - PMax_);
-   
-    //volScalarField epsilonRes_ = scalar(0)*popBal_.continuousTurbulence().epsilon();
+
+    // HSM: packing correction
+    CPack_ =
+        pos0(popBal_.alphas() - PMax_)
+       *min(sqr(1/max(1 - popBal_.alphas(), SMALL)), CPackMax_)
+      + neg(popBal_.alphas() - PMax_);
+
+    // RANS modelled epsilon only (no resolved component for SST)
     volScalarField epsilonTot_ = popBal_.continuousTurbulence().epsilon();
-/*
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
-    {
-	const objectRegistry& db = continuousPhase.db();
-        epsilonRes_ = db.lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot_ += epsilonRes_;
-    }
-    else
-    {
-	 Warning << "epsilonRes."+continuousPhase.name()+ " is not active in controlDict." << endl
-	         << "Add field epsilonRes to the fieldAverage utility in controlDict." << endl;
-    }
-*/
-//********************************* End HSM Addon **************************//
 
-
- 
     const volScalarField collisionEfficiency
     (
         exp
@@ -167,14 +217,29 @@ addToCoalescenceRate
         )
     );
 
+    // Rate contribution for this (i,j) pair
+    volScalarField rateContribution
+    (
+        IOobject
+        (
+            "rateContribution",
+            popBal_.time().timeName(),
+            popBal_.mesh(),
+            IOobject::NO_READ,
+            IOobject::NO_WRITE
+        ),
+        popBal_.mesh(),
+        dimensionedScalar("zero", dimVolume/dimTime, Zero)
+    );
+
     if (turbulentCollisions_)
     {
-        coalescenceRate +=
+        rateContribution +=
             (
                 C1_*pi*sqr(fi.dSph() + fj.dSph())
                *cbrt(epsilonTot_)
                *sqrt(pow(fi.dSph(), 2.0/3.0) + pow(fj.dSph(), 2.0/3.0))
-	       *CPack_
+               *CPack_
             )
            *collisionEfficiency;
     }
@@ -183,7 +248,7 @@ addToCoalescenceRate
     {
         const dimensionedScalar Sij(pi/4*sqr(fi.dSph() + fj.dSph()));
 
-        coalescenceRate +=
+        rateContribution +=
             (
                 Sij
                *mag
@@ -192,21 +257,19 @@ addToCoalescenceRate
                     (
                         2.14*popBal_.sigmaWithContinuousPhase(fi.phase())
                        /(continuousPhase.rho()*fi.dSph())
-		      + 0.505*mag(g)*fi.dSph()
+                      + 0.505*mag(g)*fi.dSph()
                     )
                   - sqrt
                     (
                         2.14*popBal_.sigmaWithContinuousPhase(fi.phase())
-                       /(continuousPhase.rho()*fj.dSph()) 
-		       + 0.505*mag(g)*fj.dSph()
+                       /(continuousPhase.rho()*fj.dSph())
+                      + 0.505*mag(g)*fj.dSph()
                     )
                 )
                *CPack_
-	    )
+            )
            *collisionEfficiency;
     }
-
-    coalescenceRate_ = coalescenceRate;
 
     if (laminarShearCollisions_)
     {
@@ -214,6 +277,24 @@ addToCoalescenceRate
             << "Laminar shear collision contribution not implemented for "
             << this->type() << " coalescence model."
             << exit(FatalError);
+    }
+
+    // Add to population balance rate (passed by reference)
+    coalescenceRate += rateContribution;
+
+    // FIX: accumulate (not overwrite) total and per-class diagnostic rates
+    coalescenceRate_ += rateContribution;
+
+    if (ratesInitialized_)
+    {
+        if (i < coalescenceRates_.size())
+        {
+            coalescenceRates_[i] += rateContribution;
+        }
+        if (j < coalescenceRates_.size())
+        {
+            coalescenceRates_[j] += rateContribution;
+        }
     }
 }
 

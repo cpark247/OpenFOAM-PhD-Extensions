@@ -387,6 +387,20 @@ int main(int argc, char *argv[])
             // Calculate phase fluctuating velocity (ASSIGN, do not declare)
             UPrime_[phasei] = U_phase - UMean_[phasei];
 
+            // Alpha statistics — all phases
+            const volScalarField& alpha_phase = phases[phasei];
+            averager.updateAverage(alphaMean_[phasei], alpha_phase, currentDeltaT);
+            const volScalarField alphaSqInst(alpha_phase * alpha_phase);
+            averager.updateAverage(alphaSqMean_[phasei], alphaSqInst, currentDeltaT);
+            alphaRMS_[phasei] = Foam::sqrt
+            (
+                max
+                (
+                    alphaSqMean_[phasei] - Foam::sqr(alphaMean_[phasei]),
+                    dimensionedScalar("zero", dimless, 0.0)
+                )
+            );
+
             // Field names for turbulence variables
             const word kFieldName       = "k."       + phaseName;
             const word omegaFieldName   = "omega."   + phaseName;
@@ -395,10 +409,6 @@ int main(int argc, char *argv[])
 
             if (phases[phasei].name() == "air")
             {
-                // Get phase fraction as volScalarField
-                const volScalarField& alpha_phase = phases[phasei];
-                averager.updateAverage(alphaMean_[phasei], alpha_phase, currentDeltaT);
-
                 // Isovolume fields
                 isoVol_80 = pos(alpha_phase - 0.8);
                 isoVol_90 = pos(alpha_phase - 0.9);

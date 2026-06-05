@@ -112,6 +112,7 @@ SourceFiles
 
 #include "binaryBreakupModel.H"
 #include "Table.H"
+#include "PtrList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -156,8 +157,19 @@ private:
         //- Kolmogorov length scale
         volScalarField kolmogorovLengthScale_;
 
+        //- Total binary breakup rate (instantaneous, all pairs combined)
         volScalarField binaryBreakupRate_;
-    
+
+        //- Binary breakup rate per daughter size class (instantaneous)
+        //  Index i corresponds to daughter size group fi
+        PtrList<volScalarField> binaryBreakupRates_;
+
+        //- Flag indicating if per-class fields are initialized
+        bool ratesInitialized_;
+
+        //- Last time index when rates were reset
+        mutable label lastResetTimeIndex_;
+
 
 public:
 
@@ -181,7 +193,7 @@ public:
 
     // Member Functions
 
-        //- Precomput diameter independent expressions
+        //- Precompute diameter independent expressions
         virtual void precompute();
 
         //- Add to binary breakupRate

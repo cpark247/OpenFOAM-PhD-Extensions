@@ -124,6 +124,7 @@ SourceFiles
 #define PrinceBlanchForSST_H
 
 #include "coalescenceModel.H"
+#include "PtrList.H"
 
 // * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * //
 
@@ -161,7 +162,7 @@ class PrinceBlanchForSST
 
         //- Critical film thickness, defaults to 1e-8m
         dimensionedScalar hf_;
-   	
+
         //- Switch for considering turbulent collisions
         Switch turbulentCollisions_;
 
@@ -171,7 +172,17 @@ class PrinceBlanchForSST
         //- Switch for considering buoyancy-induced collisions
         Switch laminarShearCollisions_;
 
+        //- Total coalescence rate (instantaneous, all pairs combined)
         volScalarField coalescenceRate_;
+
+        //- Coalescence rate per size class (instantaneous)
+        PtrList<volScalarField> coalescenceRates_;
+
+        //- Flag indicating if per-class fields are initialized
+        bool ratesInitialized_;
+
+        //- Last time index when rates were reset
+        mutable label lastResetTimeIndex_;
 
 
 public:
@@ -194,6 +205,9 @@ public:
 
 
     // Member Functions
+
+        //- Precompute diameter independent expressions
+        virtual void precompute();
 
         //- Add to coalescenceRate
         virtual void addToCoalescenceRate

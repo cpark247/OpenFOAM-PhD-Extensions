@@ -23,7 +23,7 @@ License
 #include "addToRunTimeSelectionTable.H"
 #include "phaseDynamicMomentumTransportModel.H"
 #include "linearInterpolationWeights.H"
-//#include "fvc.H"
+
 // * * * * * * * * * * * * * * Static Data Members * * * * * * * * * * * * * //
 
 namespace Foam
@@ -71,33 +71,30 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSST::LuoSvendsenForSST
             popBal_.mesh()
         ),
         popBal_.mesh(),
-        dimensionedScalar
-        (
-            "kolmogorovLengthScale",
-            dimLength,
-            Zero
-        )
+        dimensionedScalar("kolmogorovLengthScale", dimLength, Zero)
     ),
     binaryBreakupRate_
     (
-         IOobject
-         (
-            "binaryBreakupRate_",
-             popBal_.time().timeName(),
-             popBal_.mesh(),
-             IOobject::NO_READ,
-             IOobject::AUTO_WRITE
-         ),
-         popBal_.mesh(),
-         dimensionedScalar
-         (
-            "binaryBreakupRate_",
-            inv(dimVolume*dimTime),
-            Zero
-         )
-    )
+        IOobject
+        (
+            "binaryBreakupRateTotal",   // FIX: was "binaryBreakupRate_"
+            popBal_.time().timeName(),
+            popBal_.mesh(),
+            IOobject::NO_READ,
+            IOobject::AUTO_WRITE
+        ),
+        popBal_.mesh(),
+        dimensionedScalar("binaryBreakupRateTotal", inv(dimVolume*dimTime), Zero)
+    ),
+    binaryBreakupRates_(),
+    ratesInitialized_(false),
+    lastResetTimeIndex_(-1)
 {
-    Info << "LuoSvensenForSST()" << endl;
+    Info << "LuoSvendsenForSST(): Initializing breakup model" << endl;
+    Info << "    C4 = " << C4_.value() << endl;
+    Info << "    beta = " << beta_.value() << endl;
+    Info << "    minEddyRatio = " << minEddyRatio_.value() << endl;
+
     List<Tuple2<scalar, scalar>> gammaUpperReg2by11Table;
     List<Tuple2<scalar, scalar>> gammaUpperReg5by11Table;
     List<Tuple2<scalar, scalar>> gammaUpperReg8by11Table;
@@ -106,30 +103,46 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSST::LuoSvendsenForSST
     gammaUpperReg5by11Table.append(Tuple2<scalar, scalar>(0.0, 1.0));
     gammaUpperReg8by11Table.append(Tuple2<scalar, scalar>(0.0, 1.0));
 
+    // Fine-resolution region (z = 0.01 to 10): step 0.01
+    // Covers LES/high-turbulence cases where b < 10.
     for (scalar z = 1e-2; z <= 10.0; z = z + 1e-2)
     {
-        Tuple2<scalar, scalar> gamma2by11
-            (
-                z,
-                incGammaRatio_Q(2.0/11.0, z)
-            );
-
-        Tuple2<scalar, scalar> gamma5by11
-            (
-                z,
-                incGammaRatio_Q(5.0/11.0, z)
-            );
-
-        Tuple2<scalar, scalar> gamma8by11
-            (
-                z,
-                incGammaRatio_Q(8.0/11.0, z)
-            );
-
-        gammaUpperReg2by11Table.append(gamma2by11);
-        gammaUpperReg5by11Table.append(gamma5by11);
-        gammaUpperReg8by11Table.append(gamma8by11);
+        gammaUpperReg2by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(2.0/11.0, z))
+        );
+        gammaUpperReg5by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(5.0/11.0, z))
+        );
+        gammaUpperReg8by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(8.0/11.0, z))
+        );
     }
+
+    // Coarser-resolution extension (z = 10.1 to 500): step 0.1
+    // Required for RANS/SST flows where the dimensionless surface-energy
+    // parameter b = 12*cf*sigma/(beta*rho*eps^(2/3)*d^(5/3)) >> 10.
+    // Without this range, Q(a,b) and Q(a,t_min) are both clamped to
+    // Q(a,10), their difference evaluates to zero, and the breakup
+    // integral collapses to zero for all RANS cells.
+    for (scalar z = 10.1; z <= 500.0; z = z + 0.1)
+    {
+        gammaUpperReg2by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(2.0/11.0, z))
+        );
+        gammaUpperReg5by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(5.0/11.0, z))
+        );
+        gammaUpperReg8by11Table.append
+        (
+            Tuple2<scalar, scalar>(z, incGammaRatio_Q(8.0/11.0, z))
+        );
+    }
+
     gammaUpperReg2by11_ =
         new Function1s::Table<scalar>
         (
@@ -163,38 +176,77 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSST::LuoSvendsenForSST
 
 void Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSST::precompute()
 {
+    // FIX: initialize per-class fields on first call
+    if (!ratesInitialized_)
+    {
+        const label nSizeGroups = popBal_.sizeGroups().size();
 
-//********************************* HSM Addon **************************//
-    //const phaseModel& continuousPhase = popBal_.continuousPhase();
-    //volScalarField epsilonRes_ = scalar(0)*popBal_.continuousTurbulence().epsilon();
+        Info << "LuoSvendsenForSST::precompute(): Initializing "
+             << nSizeGroups << " per-class breakup rate fields" << endl;
+
+        binaryBreakupRates_.setSize(nSizeGroups);
+
+        forAll(popBal_.sizeGroups(), i)
+        {
+            const sizeGroup& fi = popBal_.sizeGroups()[i];
+
+            word fieldName = "binaryBreakupRate_" + fi.name();
+
+            binaryBreakupRates_.set
+            (
+                i,
+                new volScalarField
+                (
+                    IOobject
+                    (
+                        fieldName,
+                        popBal_.time().timeName(),
+                        popBal_.mesh(),
+                        IOobject::NO_READ,
+                        IOobject::NO_WRITE
+                    ),
+                    popBal_.mesh(),
+                    dimensionedScalar(fieldName, inv(dimVolume*dimTime), Zero)
+                )
+            );
+        }
+
+        ratesInitialized_ = true;
+    }
+
+    // FIX: reset rate fields once per timestep
+    const label currentTimeIndex = popBal_.mesh().time().timeIndex();
+
+    if (currentTimeIndex != lastResetTimeIndex_)
+    {
+        binaryBreakupRate_ = dimensionedScalar
+        (
+            "zero", binaryBreakupRate_.dimensions(), Zero
+        );
+
+        forAll(binaryBreakupRates_, i)
+        {
+            binaryBreakupRates_[i] = dimensionedScalar
+            (
+                "zero", binaryBreakupRates_[i].dimensions(), Zero
+            );
+        }
+
+        lastResetTimeIndex_ = currentTimeIndex;
+    }
+
+    // Compute Kolmogorov length scale from RANS modelled epsilon
     volScalarField epsilonTot_ = popBal_.continuousTurbulence().epsilon();
-/*
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
-    {
-        const objectRegistry& db = continuousPhase.db();
-        epsilonRes_ = db.lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot_ += epsilonRes_;
-    }
-    else
-    {
-         Warning << "In correct function: epsilonRes."
-                 << continuousPhase.name()
-                 << " is not active in controlDict."
-                 << endl
-                 << "Add field epsilonRes to the fieldAverage utility in controlDict."
-                 << endl;
-    }
-*/
-//********************************* End HSM Addon **************************//
 
     kolmogorovLengthScale_ =
         pow025
         (
-            pow3
+            pow3(popBal_.continuousPhase().thermo().nu())
+           /max
             (
-                popBal_.continuousPhase().thermo().nu()
+                epsilonTot_,
+                dimensionedScalar("minEps", epsilonTot_.dimensions(), 1e-14)
             )
-           / max(epsilonTot_,dimensionedScalar("minEpsilonTot_", epsilonTot_.dimensions(), 1e-14))
         );
 }
 
@@ -205,79 +257,85 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSST::addToBinaryBreakup
     volScalarField& binaryBreakupRate,
     const label i,
     const label j
-)   
+)
 {
     const phaseModel& continuousPhase = popBal_.continuousPhase();
-    const sizeGroup& fi = popBal_.sizeGroups()[i];
-    const sizeGroup& fj = popBal_.sizeGroups()[j];
-    //Info << "LuoSvensenForSST::addToBinaryBreakupRate" << endl;
-//********************************* HSM Addon **************************//
-    //volScalarField epsilonRes_ = scalar(0)*popBal_.continuousTurbulence().epsilon();
+    const sizeGroup& fi = popBal_.sizeGroups()[i];   // daughter
+    const sizeGroup& fj = popBal_.sizeGroups()[j];   // parent
+
+    // RANS modelled epsilon only (no resolved component for SST)
     volScalarField epsilonTot_ = popBal_.continuousTurbulence().epsilon();
-    
-    
 
-/*
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
-    {
-        const objectRegistry& db = continuousPhase.db();
-        epsilonRes_ = db.lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot_ += epsilonRes_;
-    }
-    else
-    {
-         Warning << "In function addToBinary: epsilonRes."
-                 << continuousPhase.name()
-                 << " is not active in controlDict."
-                 << endl
-                 << "Add field epsilonRes to the fieldAverage utility in controlDict."
-                 << endl;
-    }
-*/
-//********************************* End HSM Addon **************************//
+    const volScalarField epsilonTotSafe = max
+    (
+        epsilonTot_,
+        dimensionedScalar("minEps", epsilonTot_.dimensions(), 1e-14)
+    );
 
+    // Surface energy coefficient
     const dimensionedScalar cf
     (
         pow(fi.x()/fj.x(), 2.0/3.0) + pow((1 - fi.x()/fj.x()), 2.0/3.0) - 1
     );
 
+    // Dimensionless surface energy parameter
     const volScalarField b
     (
         12*cf*popBal_.sigmaWithContinuousPhase(fi.phase())
        /(
             beta_*continuousPhase.rho()*pow(fj.dSph(), 5.0/3.0)
-           *pow(max(epsilonTot_,dimensionedScalar("minEpsilonTot_", epsilonTot_.dimensions(), 1e-14)), 2.0/3.0)
+           *pow(epsilonTotSafe, 2.0/3.0)
         )
     );
 
+    // Minimum eddy size ratio
     const volScalarField xiMin(minEddyRatio_*kolmogorovLengthScale_/fj.d());
-
     const volScalarField tMin(b/pow(xiMin, 11.0/3.0));
 
+    // FIX: compute integral with all three gamma-function terms
+    // (previously only the 5/11 term was included)
     volScalarField integral(3/(11*pow(b, 8.0/11.0)));
 
     forAll(integral, celli)
     {
         integral[celli] *=
-            2*pow(b[celli], 3.0/11.0)*tgamma(5.0/11.0)
-           *(
-                gammaUpperReg5by11_->value(b[celli])
-              - gammaUpperReg5by11_->value(tMin[celli])
+            (
+                tgamma(8.0/11.0)
+               *(
+                    gammaUpperReg8by11_->value(b[celli])
+                  - gammaUpperReg8by11_->value(tMin[celli])
+                )
+              + 2*pow(b[celli], 3.0/11.0)*tgamma(5.0/11.0)
+               *(
+                    gammaUpperReg5by11_->value(b[celli])
+                  - gammaUpperReg5by11_->value(tMin[celli])
+                )
+              + pow(b[celli], 6.0/11.0)*tgamma(2.0/11.0)
+               *(
+                    gammaUpperReg2by11_->value(b[celli])
+                  - gammaUpperReg2by11_->value(tMin[celli])
+                )
             );
     }
 
-    binaryBreakupRate +=
+    // Rate contribution for this (i,j) pair
+    volScalarField rateContribution
+    (
         C4_*(1 - popBal_.alphas())/fj.x()
-       *cbrt
-        (
-            epsilonTot_
-           /sqr(fj.dSph())
-        )
-       *integral;
+       *cbrt(epsilonTotSafe/sqr(fj.dSph()))
+       *integral
+    );
 
-   binaryBreakupRate_ = binaryBreakupRate;   
+    // Add to population balance rate (passed by reference)
+    binaryBreakupRate += rateContribution;
 
+    // FIX: accumulate (not overwrite) total and per-class diagnostic rates
+    binaryBreakupRate_ += rateContribution;
 
+    if (ratesInitialized_ && i < binaryBreakupRates_.size())
+    {
+        binaryBreakupRates_[i] += rateContribution;
+    }
 }
 
 
