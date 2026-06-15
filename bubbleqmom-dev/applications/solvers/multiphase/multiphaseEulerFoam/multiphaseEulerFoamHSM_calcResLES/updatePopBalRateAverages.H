@@ -9,7 +9,7 @@ License
     This file is part of OpenFOAM.
 -------------------------------------------------------------------------------
 Description
-    Updates time-averaged population balance rate fields.
+    Updates population balance rate fields.
 
     Uses size group names discovered by createPopBalRateFields.H.
 
@@ -20,55 +20,80 @@ Description
     - LuoSvendsenForSAS2: binaryBreakupRate_<sizeGroupName>, binaryBreakupRateTotal
     - PrinceBlanchForSAS2: coalescenceRate_<sizeGroupName>, coalescenceRateTotal
 
-    Updates time-averaged fields created by createPopBalRateFields.H
+    Per size class the INSTANTANEOUS rates are written out:
+    - binaryBreakupRate_<sizeGroupName>_Inst is the instantaneous breakup rate
+      scaled by the daughter size-group volume width deltaV_i [-> 1/s].
+    - coalescenceRate_<sizeGroupName>_Inst is the instantaneous coalescence rate.
+    The time-averaged TOTAL rates (_Mean_) are retained, and instantaneous totals
+    are written out as well:
+    - binaryBreakupRateTotal_Inst = sum_i (binaryBreakupRate_i * deltaV_i) [1/s].
+    - coalescenceRateTotal_Inst   = instantaneous copy of coalescenceRateTotal.
 
     Requires from createPopBalRateFields.H:
     - sizeGroupNames (List<word>)
     - nSizeClasses (label)
-    - binaryBreakupRate_Mean_ (PtrList<volScalarField>)
-    - coalescenceRate_Mean_ (PtrList<volScalarField>)
+    - sizeGroupVolumeWidths (List<scalar>)
+    - binaryBreakupRate_Inst_ (PtrList<volScalarField>)
+    - coalescenceRate_Inst_ (PtrList<volScalarField>)
     - binaryBreakupRateTotal_Mean_ (volScalarField)
     - coalescenceRateTotal_Mean_ (volScalarField)
+    - binaryBreakupRateTotal_Inst (volScalarField)
+    - coalescenceRateTotal_Inst (volScalarField)
 
 \*---------------------------------------------------------------------------*/
 
-// ========== POPULATION BALANCE RATE AVERAGING ==========
+// ========== POPULATION BALANCE RATE OUTPUT ==========
 
 if (nSizeClasses > 0)
 {
-    // --- Per-class binary breakup rates ---
+    // --- Per-class binary breakup rates (instantaneous, scaled by deltaV) ---
+    // Also accumulate the deltaV-scaled total (sum over classes -> 1/s).
+    binaryBreakupRateTotal_Inst ==
+        dimensionedScalar("zero", binaryBreakupRateTotal_Inst.dimensions(), 0.0);
+
     forAll(sizeGroupNames, i)
     {
         // Instantaneous field name from LuoSvendsenForSAS2: binaryBreakupRate_f0.air, etc.
         word instFieldName = "binaryBreakupRate_" + sizeGroupNames[i];
-        
+
         if (mesh.foundObject<volScalarField>(instFieldName))
         {
             if (!popBalRateFieldsFound)
             {
-                Info<< "Found population balance rate fields - starting averaging" << endl;
+                Info<< "Found population balance rate fields - writing instantaneous rates" << endl;
                 popBalRateFieldsFound = true;
             }
-            
-            const volScalarField& instField = 
+
+            const volScalarField& instField =
                 mesh.lookupObject<volScalarField>(instFieldName);
-            
-            averager.updateAverage(binaryBreakupRate_Mean_[i], instField, currentDeltaT);
+
+            // Scale by the daughter size-group volume width deltaV_i so the
+            // written quantity has dimensions 1/s. deltaV carries dimVolume so
+            // the field dimensions resolve to inv(dimTime).
+            const dimensionedScalar dV
+            (
+                "dV", dimVolume, sizeGroupVolumeWidths[i]
+            );
+
+            binaryBreakupRate_Inst_[i] = instField*dV;
+
+            // Accumulate into the deltaV-scaled instantaneous total
+            binaryBreakupRateTotal_Inst += binaryBreakupRate_Inst_[i];
         }
     }
 
-    // --- Per-class coalescence rates ---
+    // --- Per-class coalescence rates (instantaneous) ---
     forAll(sizeGroupNames, i)
     {
         // Instantaneous field name from PrinceBlanchForSAS2: coalescenceRate_f0.air, etc.
         word instFieldName = "coalescenceRate_" + sizeGroupNames[i];
-        
+
         if (mesh.foundObject<volScalarField>(instFieldName))
         {
-            const volScalarField& instField = 
+            const volScalarField& instField =
                 mesh.lookupObject<volScalarField>(instFieldName);
-            
-            averager.updateAverage(coalescenceRate_Mean_[i], instField, currentDeltaT);
+
+            coalescenceRate_Inst_[i] = instField;
         }
     }
 }
@@ -85,8 +110,11 @@ if (mesh.foundObject<volScalarField>("binaryBreakupRateTotal"))
 // --- Total coalescence rate (always check, even if nSizeClasses == 0) ---
 if (mesh.foundObject<volScalarField>("coalescenceRateTotal"))
 {
-    const volScalarField& coalescenceRateTotal = 
+    const volScalarField& coalescenceRateTotal =
         mesh.lookupObject<volScalarField>("coalescenceRateTotal");
-    
+
     averager.updateAverage(coalescenceRateTotal_Mean_, coalescenceRateTotal, currentDeltaT);
+
+    // Instantaneous copy of the registered total
+    coalescenceRateTotal_Inst = coalescenceRateTotal;
 }
