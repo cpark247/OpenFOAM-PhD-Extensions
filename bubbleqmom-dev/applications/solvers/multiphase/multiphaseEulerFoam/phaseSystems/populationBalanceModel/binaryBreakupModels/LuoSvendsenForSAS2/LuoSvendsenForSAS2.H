@@ -157,18 +157,31 @@ private:
         //- Kolmogorov length scale
         volScalarField kolmogorovLengthScale_;
 
-        //- Total binary breakup rate (instantaneous, all pairs combined)
+        //- Size-fraction weighted mean breakup frequency [1/s]
+        //      sum_j f_j*g_j,  g_j = sum_i Omega(i:j)*deltaV(i,j)
+        //  Its reciprocal is the breakup time scale of Buffo et al. (2016).
         volScalarField binaryBreakupRate_;
 
-        //- Binary breakup rate per daughter size class (instantaneous)
-        //  Index i corresponds to daughter size group fi
+        //- Breakup frequency g_j per PARENT size class [1/s] (instantaneous)
+        //  Index j corresponds to the breaking (parent) size group fj
         PtrList<volScalarField> binaryBreakupRates_;
+
+        //- Daughter volume width deltaV(i,j) [m^3], mirroring
+        //  populationBalanceModel::calcDeltas(): the width of daughter volume
+        //  bin i truncated at half the parent volume x_j. Multiplying the
+        //  Luo-Svendsen rate density [1/(m^3 s)] by it yields a frequency.
+        List<List<scalar>> deltaV_;
 
         //- Flag indicating if per-class fields are initialized
         bool ratesInitialized_;
 
-        //- Last time index when rates were reset
-        mutable label lastResetTimeIndex_;
+        //- Parent/daughter index of the previous addToBinaryBreakupRate call,
+        //  used to detect the start of a new source-term sweep. The pair loop
+        //  in populationBalanceModel::sources() runs once per population
+        //  balance correction AND once per PIMPLE outer corrector, so a reset
+        //  keyed on the time index alone would accumulate several sweeps.
+        label lastParent_;
+        label lastDaughter_;
 
 
 public:

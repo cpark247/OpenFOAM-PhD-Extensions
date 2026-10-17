@@ -84,6 +84,14 @@ PtrList<volScalarField> epsilonRes_(nPhases);
 PtrList<volScalarField> kRes_Mean_(nPhases);
 PtrList<volScalarField> epsilonRes_Mean_(nPhases);
 
+// Dissipation rate of the MEAN resolved strain rate,
+//     epsilonVis = 2*nu*sBar_ij*sBar_ij,  sBar_ij = symm(grad(UMean))
+// Built from UMean_, hence already a mean-flow quantity (no extra averaging).
+// It is the difference between the time-average of the instantaneous resolved
+// dissipation and the true resolved dissipation:
+//     <epsilonRes> = epsilonRes_true + epsilonVis
+PtrList<volScalarField> epsilonVis_Mean_(nPhases);
+
 // ============================================================================
 // TOTAL FIELDS (INSTANTANEOUS) PER PHASE
 // ============================================================================
@@ -401,6 +409,29 @@ forAll(phases, phasei)
                     IOobject::AUTO_WRITE
                 ),
                 epsilonRes_[phasei]
+            )
+        );
+
+        epsilonVis_Mean_.set
+        (
+            phasei,
+            new volScalarField
+            (
+                IOobject
+                (
+                    "epsilonVis_Mean_." + phaseName,
+                    runTime.timeName(),
+                    mesh,
+                    IOobject::READ_IF_PRESENT,
+                    IOobject::AUTO_WRITE
+                ),
+                mesh,
+                dimensionedScalar
+                (
+                    "epsilonVis_Mean_",
+                    dimVelocity*dimVelocity/dimTime,
+                    0.0
+                )
             )
         );
 

@@ -419,17 +419,40 @@ int main(int argc, char *argv[])
             {
                 // Common calculations for both LES and RANS SRS modes
                 volScalarField nu_phase = phase.thermo().nu();
-                volTensorField gradUPrime_phase = fvc::grad(UPrime_[phasei]);
-                volSymmTensorField Sres_phase(symm(gradUPrime_phase));
+
+                // Instantaneous resolved strain-rate tensor built from the
+                // instantaneous velocity (Pope 2000):
+                //     s_ij = 0.5*(dc_i/dx_j + dc_j/dx_i) = symm(grad(U))
+                // Using the instantaneous field (rather than the fluctuation
+                // U' = U - UMean) avoids the arbitrary running-average window.
+                // Note magSqr() of a symmTensor already carries the factor 2 on
+                // the off-diagonals, i.e. magSqr(s) == s_ij*s_ij.
+                const volSymmTensorField S_phase(symm(fvc::grad(U_phase)));
+                const volScalarField SijSij(Foam::magSqr(S_phase));
                 
                 // Resolved turbulent kinetic energy: k_res = 0.5 * |U'|^2
                 kRes_[phasei] = 0.5*Foam::magSqr(UPrime_[phasei]);
                 
-                // Resolved dissipation rate: epsilon_res = 2 * nu * |S'|^2
-                epsilonRes_[phasei] = 2.0*nu_phase*Foam::magSqr(Sres_phase);
+                // Resolved dissipation rate: epsilon_res = 2*nu*s_ij*s_ij
+                // (instantaneous; its time average equals the true resolved
+                // dissipation plus the mean-flow dissipation epsilonVis below)
+                epsilonRes_[phasei] = 2.0*nu_phase*SijSij;
 
                 averager.updateAverage(kRes_Mean_[phasei],       kRes_[phasei],       currentDeltaT);
                 averager.updateAverage(epsilonRes_Mean_[phasei], epsilonRes_[phasei], currentDeltaT);
+
+                // Mean-flow (viscous) dissipation epsilonVis = 2*nu*sBar_ij*sBar_ij
+                // built from the running-mean velocity. Subtracting it from
+                // epsilonRes_Mean_ recovers the true resolved dissipation.
+                {
+                    const volSymmTensorField SMean_phase
+                    (
+                        symm(fvc::grad(UMean_[phasei]))
+                    );
+
+                    epsilonVis_Mean_[phasei] =
+                        2.0*nu_phase*Foam::magSqr(SMean_phase);
+                }
 
                 // Get nut (turbulent viscosity) - available for both LES and RANS
                 nuMod_[phasei] = mesh.lookupObject<volScalarField>(nutFieldName);
@@ -473,8 +496,11 @@ int main(int argc, char *argv[])
                     volScalarField denominator_k = C_k * delta_safe;
                     kMod_[phasei] = sqr(nuMod_[phasei] / denominator_k);
                     
-                    // epsilonMod = 2 * nut * |S'|^2  (SGS dissipation estimate)
-                    epsilonMod_[phasei] = 2.0 * nuMod_[phasei] * Foam::magSqr(Sres_phase);
+                    // Sub-grid dissipation epsilonMod = 2*nu_t*s_ij*s_ij,
+                    // evaluated on the SAME instantaneous resolved strain rate
+                    // as epsilonRes so that
+                    //     epsilonTotal = 2*(nu + nu_t)*s_ij*s_ij
+                    epsilonMod_[phasei] = 2.0*nuMod_[phasei]*SijSij;
                     
                     // Alternative: epsilonMod from kMod (commented out)
                     // epsilonMod_[phasei] = C_eps * pow(max(kMod_[phasei], 

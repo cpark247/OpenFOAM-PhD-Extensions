@@ -172,18 +172,26 @@ class PrinceBlanchForSAS2
         //- Switch for considering buoyancy-induced collisions
         Switch laminarShearCollisions_;
 
-        //- Total coalescence rate (instantaneous, all pairs combined)
+        //- Size-fraction weighted mean coalescence kernel [m^3/s]
+        //      sum_i sum_j f_i*f_j*a_ij
+        //  The solver turns it into a frequency with the Buffo et al. (2016)
+        //  conversion, a*alpha_d/((pi/6)*d_32^3).
         volScalarField coalescenceRate_;
 
-        //- Coalescence rate per size class (instantaneous)
-        //  Index i corresponds to size group fi
+        //- Mean coalescence kernel seen by size class i [m^3/s]
+        //      sum_j f_j*a_ij
         PtrList<volScalarField> coalescenceRates_;
 
         //- Flag indicating if per-class fields are initialized
         bool ratesInitialized_;
 
-        //- Last time index when rates were reset
-        mutable label lastResetTimeIndex_;
+        //- Size-group indices of the previous addToCoalescenceRate call, used
+        //  to detect the start of a new source-term sweep. The pair loop in
+        //  populationBalanceModel::sources() runs once per population balance
+        //  correction AND once per PIMPLE outer corrector, so a reset keyed on
+        //  the time index alone would accumulate several sweeps.
+        label lastI_;
+        label lastJ_;
 
 
 public:

@@ -21,22 +21,28 @@ Description
     
     Include this AFTER createFields.H and createMultiphaseResolvedLESFields.H.
 
-    Fields created:
-    - binaryBreakupRate_<sizeGroupName>_Inst   (instantaneous, scaled by the
-      daughter size-group volume width deltaV_i; e.g. binaryBreakupRate_f0.air_Inst)
-    - coalescenceRate_<sizeGroupName>_Inst     (instantaneous)
-    - binaryBreakupRateTotal_Mean_             (time-averaged)
-    - coalescenceRateTotal_Mean_               (time-averaged)
-    - binaryBreakupRateTotal_Inst              (instantaneous, sum of deltaV-scaled
-      per-class breakup rates -> 1/s)
-    - coalescenceRateTotal_Inst                (instantaneous copy of the total)
-    - <sizeGroupName>_Mean_                     (time-averaged; e.g., f0.air_Mean_)
+    All rate fields are FREQUENCIES [1/s], so that the time scales of
+    Buffo et al. (2016), doi:10.1016/j.ces.2016.07.032, follow directly as the
+    reciprocal:
+        tau_breakup     = 1/binaryBreakupRateTotal_Inst
+        tau_coalescence = 1/coalescenceRateTotal_Inst
 
-    Volume width per size group:
-        deltaV_i = (pi/6)*(d_{i+1/2}^3 - d_{i-1/2}^3)
-    with diameter boundaries taken as midpoints between representative
-    diameters and the two edge bins extended symmetrically (lower bound
-    clipped at zero).
+    LuoSvendsenForSAS2 already emits breakup frequencies (its rate density is
+    integrated over the daughter volume bin inside the model, using the same
+    volume widths as populationBalanceModel::calcDeltas()).
+    PrinceBlanchForSAS2 emits coalescence KERNELS [m^3/s]; updatePopBalRate-
+    Averages.H converts them with the number density built from the Sauter
+    mean diameter, n = alpha_d/((pi/6)*d_32^3), as given in the reference.
+
+    Fields created:
+    - binaryBreakupRate_<sizeGroupName>_Inst   (instantaneous, 1/s;
+      breakup frequency of that PARENT class, e.g. binaryBreakupRate_f0.air_Inst)
+    - coalescenceRate_<sizeGroupName>_Inst     (instantaneous, 1/s)
+    - binaryBreakupRateTotal_Mean_             (time-averaged, 1/s)
+    - coalescenceRateTotal_Mean_               (time-averaged, 1/s)
+    - binaryBreakupRateTotal_Inst              (instantaneous, 1/s)
+    - coalescenceRateTotal_Inst                (instantaneous, 1/s)
+    - <sizeGroupName>_Mean_                     (time-averaged; e.g., f0.air_Mean_)
 
 \*---------------------------------------------------------------------------*/
 
@@ -46,9 +52,10 @@ label nSizeClasses = 0;
 List<word> sizeGroupNames;
 List<scalar> sizeGroupDiameters;
 
-// Volume width deltaV_i of each size group (used to scale breakup rates on
-// output); populated below once diameters are known.
-List<scalar> sizeGroupVolumeWidths;
+// Name of the dispersed phase carrying the size groups (parsed from the size
+// group field names, e.g. "f0.air" -> "air"). Used to look up alpha.<phase>
+// for the Buffo et al. (2016) coalescence frequency conversion.
+word dispersedPhaseName;
 
 // Store the dimension of f fields (will be read from actual mesh fields)
 dimensionSet fFieldDimensions(dimless);
@@ -151,6 +158,13 @@ PtrList<volScalarField> f_Mean_;
         }
         
         Info << "Found " << nSizeClasses << " size group fields: " << sizeGroupNames << endl;
+
+        // "f0.air" -> "air"
+        dispersedPhaseName =
+            sizeGroupNames[0].substr(sizeGroupNames[0].find(".") + 1);
+
+        Info << "Dispersed phase carrying the size groups: "
+             << dispersedPhaseName << endl;
         
         // Get the dimensions of the first f field to use for f_Mean_ creation
         {
@@ -260,59 +274,6 @@ PtrList<volScalarField> f_Mean_;
             }
         }
 
-        // Step 3: Compute the volume width deltaV_i of each size group.
-        // Diameter boundaries are midpoints between representative diameters;
-        // the two edge bins are extended symmetrically and the lower bound is
-        // clipped at zero. deltaV_i = (pi/6)*(dHi^3 - dLo^3).
-        sizeGroupVolumeWidths.setSize(nSizeClasses, 0.0);
-
-        const scalar piBy6 = 3.14159265358979323846/6.0;
-
-        Info<< "Computing size-group volume widths (deltaV)..." << endl;
-
-        forAll(sizeGroupNames, i)
-        {
-            const scalar di = sizeGroupDiameters[i];
-
-            // Lower diameter boundary
-            scalar dLo;
-            if (i == 0)
-            {
-                const scalar dHi0 =
-                    (nSizeClasses > 1)
-                  ? 0.5*(di + sizeGroupDiameters[1])
-                  : di;
-                dLo = 2.0*di - dHi0;            // symmetric edge extension
-            }
-            else
-            {
-                dLo = 0.5*(sizeGroupDiameters[i-1] + di);
-            }
-
-            // Upper diameter boundary
-            scalar dHi;
-            if (i == nSizeClasses - 1)
-            {
-                const scalar dLoLast =
-                    (nSizeClasses > 1)
-                  ? 0.5*(sizeGroupDiameters[i-1] + di)
-                  : di;
-                dHi = 2.0*di - dLoLast;         // symmetric edge extension
-            }
-            else
-            {
-                dHi = 0.5*(di + sizeGroupDiameters[i+1]);
-            }
-
-            dLo = max(dLo, scalar(0));          // no negative volume
-
-            sizeGroupVolumeWidths[i] =
-                piBy6*(Foam::pow3(dHi) - Foam::pow3(dLo));
-
-            Info<< "    " << sizeGroupNames[i]
-                << ": dRange = [" << dLo << ", " << dHi << "] m"
-                << ", deltaV = " << sizeGroupVolumeWidths[i] << " m^3" << endl;
-        }
     }
 }
 
@@ -321,8 +282,8 @@ PtrList<volScalarField> f_Mean_;
 if (nSizeClasses > 0)
 {
     // ========== INSTANTANEOUS BREAKUP RATE FIELDS ==========
-    // Written instantaneously and scaled by the daughter size-group volume
-    // width deltaV_i, so dimensions are inv(dimTime) [1/s].
+    // Breakup frequency [1/s] of each PARENT size class, taken straight from
+    // LuoSvendsenForSAS2 (no post-scaling needed).
 
     binaryBreakupRate_Inst_.setSize(nSizeClasses);
 
@@ -350,6 +311,9 @@ if (nSizeClasses > 0)
     }
 
     // ========== INSTANTANEOUS COALESCENCE RATE FIELDS ==========
+    // Coalescence frequency [1/s]: the mean kernel of PrinceBlanchForSAS2
+    // multiplied by the d_32-based number density (see
+    // updatePopBalRateAverages.H).
 
     coalescenceRate_Inst_.setSize(nSizeClasses);
 
@@ -371,7 +335,7 @@ if (nSizeClasses > 0)
                     IOobject::AUTO_WRITE
                 ),
                 mesh,
-                dimensionedScalar(fieldName, dimVolume/dimTime, 0.0)
+                dimensionedScalar(fieldName, inv(dimTime), 0.0)
             )
         );
     }
@@ -404,14 +368,14 @@ if (nSizeClasses > 0)
         );
     }
     
-    Info << "Created " << nSizeClasses << " instantaneous breakup rate fields (scaled by deltaV)" << endl;
-    Info << "Created " << nSizeClasses << " instantaneous coalescence rate fields" << endl;
+    Info << "Created " << nSizeClasses << " instantaneous breakup frequency fields [1/s]" << endl;
+    Info << "Created " << nSizeClasses << " instantaneous coalescence frequency fields [1/s]" << endl;
     Info << "Created " << nSizeClasses << " time-averaged size fraction fields" << endl;
 }
 
 // ========== TOTAL RATE FIELDS (always created) ==========
 
-// Total breakup rate (time-averaged)
+// Total breakup frequency (time-averaged, 1/s)
 volScalarField binaryBreakupRateTotal_Mean_
 (
     IOobject
@@ -423,10 +387,10 @@ volScalarField binaryBreakupRateTotal_Mean_
         IOobject::AUTO_WRITE
     ),
     mesh,
-    dimensionedScalar("binaryBreakupRateTotal_Mean_", inv(dimVolume*dimTime), 0.0)
+    dimensionedScalar("binaryBreakupRateTotal_Mean_", inv(dimTime), 0.0)
 );
 
-// Total coalescence rate (time-averaged)
+// Total coalescence frequency (time-averaged, 1/s)
 volScalarField coalescenceRateTotal_Mean_
 (
     IOobject
@@ -438,10 +402,10 @@ volScalarField coalescenceRateTotal_Mean_
         IOobject::AUTO_WRITE
     ),
     mesh,
-    dimensionedScalar("coalescenceRateTotal_Mean_", dimVolume/dimTime, 0.0)
+    dimensionedScalar("coalescenceRateTotal_Mean_", inv(dimTime), 0.0)
 );
 
-// Total breakup rate (instantaneous, sum of deltaV-scaled per-class -> 1/s)
+// Total breakup frequency (instantaneous, 1/s)
 volScalarField binaryBreakupRateTotal_Inst
 (
     IOobject
@@ -456,7 +420,7 @@ volScalarField binaryBreakupRateTotal_Inst
     dimensionedScalar("binaryBreakupRateTotal_Inst", inv(dimTime), 0.0)
 );
 
-// Total coalescence rate (instantaneous)
+// Total coalescence frequency (instantaneous, 1/s)
 volScalarField coalescenceRateTotal_Inst
 (
     IOobject
@@ -468,5 +432,5 @@ volScalarField coalescenceRateTotal_Inst
         IOobject::AUTO_WRITE
     ),
     mesh,
-    dimensionedScalar("coalescenceRateTotal_Inst", dimVolume/dimTime, 0.0)
+    dimensionedScalar("coalescenceRateTotal_Inst", inv(dimTime), 0.0)
 );

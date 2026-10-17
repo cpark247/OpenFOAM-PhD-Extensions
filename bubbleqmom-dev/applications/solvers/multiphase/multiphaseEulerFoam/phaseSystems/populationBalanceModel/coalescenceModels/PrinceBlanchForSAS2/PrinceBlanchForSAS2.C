@@ -85,7 +85,7 @@ PrinceBlanchForSAS2
     ),
     C1_("C1", dimless, dict.lookupOrDefault<scalar>("C1", 0.356)),
     h0_("h0", dimLength, dict.lookupOrDefault<scalar>("h0", 1e-4)),
-    hf_("hf", dimLength, dict.lookupOrDefault<scalar>("h0", 1e-8)),
+    hf_("hf", dimLength, dict.lookupOrDefault<scalar>("hf", 1e-8)),
     turbulentCollisions_(dict.lookup("turbulentCollisions")),
     buoyantCollisions_(dict.lookup("buoyantCollisions")),
     laminarShearCollisions_(dict.lookup("laminarShearCollisions")),
@@ -109,7 +109,8 @@ PrinceBlanchForSAS2
     ),
     coalescenceRates_(),
     ratesInitialized_(false),
-    lastResetTimeIndex_(-1)
+    lastI_(-1),
+    lastJ_(-1)
 {
     Info << "PrinceBlanchForSAS2(): Initializing coalescence model" << endl;
     Info << "    PMax = " << PMax_.value() << endl;
@@ -168,29 +169,6 @@ void Foam::diameterModels::coalescenceModels::PrinceBlanchForSAS2::precompute()
         
         ratesInitialized_ = true;
     }
-
-    // Reset rate fields at the start of each new timestep
-    const label currentTimeIndex = popBal_.mesh().time().timeIndex();
-    
-    if (currentTimeIndex != lastResetTimeIndex_)
-    {
-        // Reset total rate
-        coalescenceRate_ = dimensionedScalar
-        (
-            "zero", coalescenceRate_.dimensions(), Zero
-        );
-        
-        // Reset per-class rates
-        forAll(coalescenceRates_, i)
-        {
-            coalescenceRates_[i] = dimensionedScalar
-            (
-                "zero", coalescenceRates_[i].dimensions(), Zero
-            );
-        }
-        
-        lastResetTimeIndex_ = currentTimeIndex;
-    }
 }
 
 
@@ -210,22 +188,73 @@ addToCoalescenceRate
 
     const dimensionedScalar rij(1/(1/fi.dSph() + 1/fj.dSph()));
 
+    // Detect the start of a new source-term sweep. populationBalanceModel
+    // walks the pairs in lexicographic (i, j) order, so a pair that does not
+    // advance that order marks a fresh sweep. Resetting on the time index
+    // alone would not do: the pair loop runs once per population balance
+    // correction AND once per PIMPLE outer corrector.
+    if (ratesInitialized_ && (i < lastI_ || (i == lastI_ && j <= lastJ_)))
+    {
+        coalescenceRate_ = dimensionedScalar
+        (
+            "zero", coalescenceRate_.dimensions(), Zero
+        );
+
+        forAll(coalescenceRates_, k)
+        {
+            coalescenceRates_[k] = dimensionedScalar
+            (
+                "zero", coalescenceRates_[k].dimensions(), Zero
+            );
+        }
+    }
+
+    lastI_ = i;
+    lastJ_ = j;
+
 //********************************* HSM Addon **************************//
     CPack_ = pos0(popBal_.alphas() - PMax_) * min(sqr(1/max(1 - popBal_.alphas(), SMALL)), CPackMax_) + neg(popBal_.alphas() - PMax_);
    
-    volScalarField epsilonRes_ = scalar(0)*popBal_.continuousTurbulence().epsilon();
-    volScalarField epsilonTot_ = popBal_.continuousTurbulence().epsilon();
+    // Total dissipation rate seen by the kernel.
+    // Preferred source: epsilonTotal.<phase>, registered by the resolved-LES
+    // solver as
+    //     epsilon = epsilonRes + epsilonMod = 2*(nu + nu_t)*s_ij*s_ij
+    // with s_ij the INSTANTANEOUS resolved strain rate (Pope 2000). The
+    // turbulence model's own epsilon() is an equilibrium estimate
+    // (Ce*k_sgs^1.5/delta) and must not be mixed in when epsilonTotal is
+    // available, otherwise the sub-grid part would be counted twice.
+    //
+    // Fallbacks, in order:
+    //   1. turbulence-model epsilon + epsilonRes.<phase>  (legacy behaviour)
+    //   2. turbulence-model epsilon alone                 (RANS)
+    const objectRegistry& db = continuousPhase.db();
 
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
+    volScalarField epsilonTot_(popBal_.continuousTurbulence().epsilon());
+
+    if (db.foundObject<volScalarField>("epsilonTotal."+continuousPhase.name()))
     {
-	const objectRegistry& db = continuousPhase.db();
-        epsilonRes_ = db.lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot_ += epsilonRes_;
+        epsilonTot_ =
+            db.lookupObject<volScalarField>
+            (
+                "epsilonTotal."+continuousPhase.name()
+            );
+    }
+    else if (db.foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
+    {
+        epsilonTot_ +=
+            db.lookupObject<volScalarField>
+            (
+                "epsilonRes."+continuousPhase.name()
+            );
     }
     else
     {
-	 Warning << "epsilonRes."+continuousPhase.name()+ " is not active in controlDict." << endl
-	         << "Add field epsilonRes to the fieldAverage utility in controlDict." << endl;
+        Warning
+            << "Neither epsilonTotal." << continuousPhase.name()
+            << " nor epsilonRes." << continuousPhase.name()
+            << " is registered." << endl
+            << "Falling back to the turbulence model dissipation rate only."
+            << endl;
     }
 
 //********************************* End HSM Addon **************************//
@@ -311,20 +340,34 @@ addToCoalescenceRate
     // Add to the population balance coalescence rate (passed by reference)
     coalescenceRate += rateContribution;
 
-    // Accumulate to total rate
-    coalescenceRate_ += rateContribution;
-
-    // Accumulate to per-class rates for BOTH participating classes
-    // When bubbles from class i and j coalesce, both classes contribute
+    // ---- Diagnostics: size-fraction weighted mean coalescence kernel ----
+    // rateContribution is the kernel a(v_i, v_j) [m^3/s]. Weighting it with
+    // the size fractions gives the expected kernel for two independently drawn
+    // bubbles, the class-method analogue of evaluating the kernel at a single
+    // representative diameter. The solver converts it to a frequency with the
+    // Buffo et al. (2016) relation, a*alpha_d/((pi/6)*d_32^3), whose
+    // reciprocal is the coalescence time scale.
+    //
+    // addToCoalescenceRate() is called once per UNORDERED pair (j <= i), so
+    // the off-diagonal pairs carry a factor 2 to complete the double sum
+    //     sum_i sum_j f_i*f_j*a_ij.
     if (ratesInitialized_)
     {
-        if (i < coalescenceRates_.size())
+        // Mean kernel seen by each participating class, sum_j f_j*a_ij
+        coalescenceRates_[i] += rateContribution*fj;
+
+        if (i != j)
         {
-            coalescenceRates_[i] += rateContribution;
+            coalescenceRates_[j] += rateContribution*fi;
         }
-        if (j < coalescenceRates_.size())
+
+        if (i == j)
         {
-            coalescenceRates_[j] += rateContribution;
+            coalescenceRate_ += rateContribution*fi*fj;
+        }
+        else
+        {
+            coalescenceRate_ += 2.0*rateContribution*fi*fj;
         }
     }
 }

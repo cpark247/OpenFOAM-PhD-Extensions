@@ -85,11 +85,13 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSAS2::LuoSvendsenForSAS
             IOobject::AUTO_WRITE  // Write instantaneous total
         ),
         popBal_.mesh(),
-        dimensionedScalar("binaryBreakupRateTotal", inv(dimVolume*dimTime), Zero)
+        dimensionedScalar("binaryBreakupRateTotal", inv(dimTime), Zero)
     ),
     binaryBreakupRates_(),
+    deltaV_(),
     ratesInitialized_(false),
-    lastResetTimeIndex_(-1)
+    lastParent_(-1),
+    lastDaughter_(-1)
 {
     Info << "LuoSvendsenForSAS2(): Initializing breakup model" << endl;
     Info << "    C4 = " << C4_.value() << endl;
@@ -188,46 +190,110 @@ void Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSAS2::precompute()
                         IOobject::NO_WRITE  // Instantaneous per-class NOT written
                     ),
                     popBal_.mesh(),
-                    dimensionedScalar(fieldName, inv(dimVolume*dimTime), Zero)
+                    dimensionedScalar(fieldName, inv(dimTime), Zero)
                 )
             );
         }
         
+        // Rebuild the volume grid used by populationBalanceModel::calcDeltas().
+        // Boundaries are midpoints in VOLUME space, with the two outer
+        // boundaries collapsed onto the first/last representative volumes:
+        //     v[0] = x_0,  v[k] = 0.5*(x_[k-1] + x_[k]),  v[N] = x_[N-1]
+        List<scalar> v(nSizeGroups + 1, 0.0);
+
+        v[0] = popBal_.sizeGroups()[0].x().value();
+
+        for (label k = 1; k < nSizeGroups; k++)
+        {
+            v[k] =
+                0.5
+               *(
+                    popBal_.sizeGroups()[k-1].x().value()
+                  + popBal_.sizeGroups()[k].x().value()
+                );
+        }
+
+        v[nSizeGroups] = popBal_.sizeGroups()[nSizeGroups-1].x().value();
+
+        // deltaV_[i][j]: width of daughter volume bin i, truncated at half the
+        // parent volume x_j, since binary breakup only produces daughters up
+        // to half the parent volume.
+        deltaV_.setSize(nSizeGroups);
+
+        Info<< "    Daughter volume widths deltaV(daughter, parent) [m^3]:"
+            << endl;
+
+        forAll(deltaV_, i)
+        {
+            deltaV_[i].setSize(nSizeGroups, 0.0);
+
+            for (label j = 0; j < nSizeGroups; j++)
+            {
+                const scalar xHalf = 0.5*popBal_.sizeGroups()[j].x().value();
+
+                if (xHalf <= v[i])
+                {
+                    deltaV_[i][j] = 0.0;
+                }
+                else if (xHalf < v[i+1])
+                {
+                    deltaV_[i][j] = xHalf - v[i];
+                }
+                else
+                {
+                    deltaV_[i][j] = v[i+1] - v[i];
+                }
+            }
+
+            Info<< "        daughter " << i << ": " << deltaV_[i] << endl;
+        }
+
         ratesInitialized_ = true;
     }
 
-    // Reset rate fields at the start of each new timestep
-    const label currentTimeIndex = popBal_.mesh().time().timeIndex();
-    
-    if (currentTimeIndex != lastResetTimeIndex_)
-    {
-        // Reset total rate
-        binaryBreakupRate_ = dimensionedScalar
-        (
-            "zero", binaryBreakupRate_.dimensions(), Zero
-        );
-        
-        // Reset per-class rates
-        forAll(binaryBreakupRates_, i)
-        {
-            binaryBreakupRates_[i] = dimensionedScalar
-            (
-                "zero", binaryBreakupRates_[i].dimensions(), Zero
-            );
-        }
-        
-        lastResetTimeIndex_ = currentTimeIndex;
-    }
-
     //******************** HSM Addon: Total dissipation rate ********************//
+    // Preferred source: epsilonTotal.<phase>, registered by the resolved-LES
+    // solver as
+    //     epsilon = epsilonRes + epsilonMod = 2*(nu + nu_t)*s_ij*s_ij
+    // with s_ij the INSTANTANEOUS resolved strain rate (Pope 2000). The
+    // turbulence model's own epsilon() is an equilibrium estimate
+    // (Ce*k_sgs^1.5/delta) and must not be mixed in when epsilonTotal is
+    // available, otherwise the sub-grid part would be counted twice.
+    //
+    // Fallbacks, in order:
+    //   1. turbulence-model epsilon + epsilonRes.<phase>  (legacy behaviour)
+    //   2. turbulence-model epsilon alone                 (RANS)
     const phaseModel& continuousPhase = popBal_.continuousPhase();
-    volScalarField epsilonTot = popBal_.continuousTurbulence().epsilon();
 
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
+    volScalarField epsilonTot(popBal_.continuousTurbulence().epsilon());
+
+    if
+    (
+        continuousPhase.db().foundObject<volScalarField>
+        (
+            "epsilonTotal."+continuousPhase.name()
+        )
+    )
     {
-        const volScalarField& epsilonRes = 
-            continuousPhase.db().lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot += epsilonRes;
+        epsilonTot =
+            continuousPhase.db().lookupObject<volScalarField>
+            (
+                "epsilonTotal."+continuousPhase.name()
+            );
+    }
+    else if
+    (
+        continuousPhase.db().foundObject<volScalarField>
+        (
+            "epsilonRes."+continuousPhase.name()
+        )
+    )
+    {
+        epsilonTot +=
+            continuousPhase.db().lookupObject<volScalarField>
+            (
+                "epsilonRes."+continuousPhase.name()
+            );
     }
     //******************** End HSM Addon ********************//
 
@@ -253,14 +319,65 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSAS2::addToBinaryBreaku
     const sizeGroup& fi = popBal_.sizeGroups()[i];  // Daughter
     const sizeGroup& fj = popBal_.sizeGroups()[j];  // Parent
 
-    //******************** HSM Addon: Total dissipation rate ********************//
-    volScalarField epsilonTot = popBal_.continuousTurbulence().epsilon();
-
-    if (continuousPhase.db().foundObject<volScalarField>("epsilonRes."+continuousPhase.name()))
+    // Detect the start of a new source-term sweep. populationBalanceModel
+    // walks the pairs in lexicographic (parent, daughter) order, so a pair
+    // that does not advance that order marks a fresh sweep. Resetting on the
+    // time index alone would not do: the pair loop runs once per population
+    // balance correction AND once per PIMPLE outer corrector.
+    if
+    (
+        ratesInitialized_
+     && (j < lastParent_ || (j == lastParent_ && i <= lastDaughter_))
+    )
     {
-        const volScalarField& epsilonRes = 
-            continuousPhase.db().lookupObject<volScalarField>("epsilonRes."+continuousPhase.name());
-        epsilonTot += epsilonRes;
+        binaryBreakupRate_ = dimensionedScalar
+        (
+            "zero", binaryBreakupRate_.dimensions(), Zero
+        );
+
+        forAll(binaryBreakupRates_, k)
+        {
+            binaryBreakupRates_[k] = dimensionedScalar
+            (
+                "zero", binaryBreakupRates_[k].dimensions(), Zero
+            );
+        }
+    }
+
+    lastParent_ = j;
+    lastDaughter_ = i;
+
+    //******************** HSM Addon: Total dissipation rate ********************//
+    // See precompute() for the selection logic.
+    volScalarField epsilonTot(popBal_.continuousTurbulence().epsilon());
+
+    if
+    (
+        continuousPhase.db().foundObject<volScalarField>
+        (
+            "epsilonTotal."+continuousPhase.name()
+        )
+    )
+    {
+        epsilonTot =
+            continuousPhase.db().lookupObject<volScalarField>
+            (
+                "epsilonTotal."+continuousPhase.name()
+            );
+    }
+    else if
+    (
+        continuousPhase.db().foundObject<volScalarField>
+        (
+            "epsilonRes."+continuousPhase.name()
+        )
+    )
+    {
+        epsilonTot +=
+            continuousPhase.db().lookupObject<volScalarField>
+            (
+                "epsilonRes."+continuousPhase.name()
+            );
     }
     //******************** End HSM Addon ********************//
 
@@ -326,13 +443,27 @@ Foam::diameterModels::binaryBreakupModels::LuoSvendsenForSAS2::addToBinaryBreaku
     // Add to population balance rate (passed by reference)
     binaryBreakupRate += rateContribution;
 
-    // Accumulate to total rate
-    binaryBreakupRate_ += rateContribution;
-
-    // Accumulate to per-daughter-class rate
-    if (ratesInitialized_ && i < binaryBreakupRates_.size())
+    // ---- Diagnostics: convert the rate density into a breakup frequency ----
+    // rateContribution is Omega(v_i : v_j) [1/(m^3 s)], a rate density in
+    // daughter-volume space. Integrating it over the daughter volume bin, i.e.
+    // multiplying by deltaV(i,j), yields the breakup frequency [1/s] of a
+    // parent in class j -- the very product populationBalanceModel uses in
+    // deathByBinaryBreakup(). Its reciprocal is the breakup time scale of
+    // Buffo et al. (2016).
+    if (ratesInitialized_)
     {
-        binaryBreakupRates_[i] += rateContribution;
+        const dimensionedScalar dV("dV", dimVolume, deltaV_[i][j]);
+
+        const volScalarField gContribution(rateContribution*dV);
+
+        // Breakup frequency of the PARENT class
+        binaryBreakupRates_[j] += gContribution;
+
+        // Size-fraction weighted mean breakup frequency, sum_j f_j*g_j. Since
+        // sum_j f_j = 1 this is the mean frequency of the dispersed phase; for
+        // a monodisperse population it collapses to the single-size breakup
+        // frequency of Buffo et al. (2016).
+        binaryBreakupRate_ += gContribution*fj;
     }
 }
 
