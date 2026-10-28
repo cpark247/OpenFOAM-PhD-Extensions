@@ -10,6 +10,8 @@ wmake $targetType interfacialCompositionModels
 
 wmake multiphaseCompressibleMomentumTransportModels
 multiphaseEulerFoam/Allwmake $targetType $*
-multiphaseEulerFoamHSM_calcRes/Allwmake $targetType $
+multiphaseEulerFoamHSM_RANS/Allwmake $targetType $*
+multiphaseEulerFoamHSM_calcResLES/Allwmake $targetType $*
+multiphaseEulerFoamHSM_calcResLES_mono/Allwmake $targetType $*
 
 #------------------------------------------------------------------------------

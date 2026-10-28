@@ -1,3 +1,0 @@
-SOURCE += stabilityBlendingFactor.C
-
-LIB = $(FOAM_USER_LIBBIN)/libstabilityBlendingFactor

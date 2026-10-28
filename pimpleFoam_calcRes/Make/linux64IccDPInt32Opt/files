@@ -1,3 +1,0 @@
-SOURCE += pimpleFoam_calcRes.C
-
-EXE = $(FOAM_USER_APPBIN)/pimpleFoam_calcRes

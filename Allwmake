@@ -1,0 +1,56 @@
+#!/bin/sh
+#------------------------------------------------------------------------------
+# Build everything in OpenFOAM-PhD-Extensions against OpenFOAM Foundation v9.
+#
+#   source /opt/openfoam9/etc/bashrc    # or your own OpenFOAM-9 installation
+#   ./Allwmake -j                       # parallel build
+#
+# Libraries go to $FOAM_USER_LIBBIN, executables to $FOAM_USER_APPBIN.
+# Order matters: the multiphase solver links against the modified turbulence
+# models library, so turbModels_mod is built first.
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1
+
+if [ -z "$WM_PROJECT_DIR" ]
+then
+    echo "Error: OpenFOAM environment not set. Source OpenFOAM-9 etc/bashrc first." 1>&2
+    exit 1
+fi
+
+if [ "$WM_PROJECT_VERSION" != "9" ]
+then
+    echo "Warning: written for OpenFOAM Foundation v9, found '$WM_PROJECT_VERSION'." 1>&2
+fi
+
+# Parse arguments for library compilation (-j, -q, ...)
+. "$WM_PROJECT_DIR/wmake/scripts/AllwmakeParseArguments"
+
+# 1. Turbulence models (kOmegaSST_ext, kOmegaSSTSAS_ext)
+wmakeLnInclude -u turbModels_mod/src/MomentumTransportModels/momentumTransportModels
+wmake $targetType turbModels_mod/src/MomentumTransportModels/incompressible
+
+# 2. Boundary conditions
+wmake $targetType porousBafflePressureAMI
+wmake $targetType periodicTimeVaryingMappedFixedValue
+
+# 3. Pre-/post-processing utilities
+for app in \
+    calcEpsilon calcOmega calcRST \
+    perturbU/perturbUChannel perturbU/perturbUCylinder perturbU/perturbUGeneric \
+    perturbU/perturbUDuct perturbU/perturbURectDuct
+do
+    wmake "$app"
+done
+
+# 4. Single-phase solvers with run-time statistics
+for app in pimpleFoam_calcMean pimpleFoam_calcRes pimpleFoam_calcRes_S2W2
+do
+    wmake "$app"
+done
+
+# 5. Multiphase (Euler-Euler + population balance) solver family
+bubbleqmom-dev/src/Allwmake $targetType $*
+bubbleqmom-dev/applications/utilities/generateMoments/Allwmake $targetType $*
+bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/Allwmake $targetType $*
+
+#------------------------------------------------------------------------------

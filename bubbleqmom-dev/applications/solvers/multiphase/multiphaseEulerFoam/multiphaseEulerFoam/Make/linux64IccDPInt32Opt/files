@@ -1,3 +1,0 @@
-SOURCE += multiphaseEulerFoamHSM.C
-
-EXE = $(FOAM_USER_APPBIN)/multiphaseEulerFoamHSM

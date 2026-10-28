@@ -22,11 +22,12 @@ License
     along with OpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 
 Application
-    boxTurb
+    calcEpsilon
 
 Description
-    Makes a box of turbulence which conforms to a given energy
-    spectrum and is divergence free.
+    Computes the turbulent dissipation rate epsilon = Cmu*k*omega (Cmu = 0.09)
+    from existing k and omega fields and writes it, e.g. to initialise or
+    switch a case from a k-omega to a k-epsilon type model.
 
 \*---------------------------------------------------------------------------*/
 

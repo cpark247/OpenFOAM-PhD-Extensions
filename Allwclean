@@ -1,0 +1,29 @@
+#!/bin/sh
+#------------------------------------------------------------------------------
+# Remove build output for everything built by ./Allwmake
+#------------------------------------------------------------------------------
+cd "${0%/*}" || exit 1
+
+if [ -z "$WM_PROJECT_DIR" ]
+then
+    echo "Error: OpenFOAM environment not set. Source OpenFOAM-9 etc/bashrc first." 1>&2
+    exit 1
+fi
+
+for dir in \
+    turbModels_mod/src/MomentumTransportModels/incompressible \
+    porousBafflePressureAMI periodicTimeVaryingMappedFixedValue \
+    calcEpsilon calcOmega calcRST \
+    perturbU/perturbUChannel perturbU/perturbUCylinder perturbU/perturbUGeneric \
+    perturbU/perturbUDuct perturbU/perturbURectDuct \
+    pimpleFoam_calcMean pimpleFoam_calcRes pimpleFoam_calcRes_S2W2
+do
+    wclean "$dir"
+done
+rm -rf turbModels_mod/src/MomentumTransportModels/momentumTransportModels/lnInclude
+
+[ -x bubbleqmom-dev/src/Allwclean ] && bubbleqmom-dev/src/Allwclean
+[ -x bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/Allwclean ] && \
+    bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/Allwclean
+
+#------------------------------------------------------------------------------

@@ -1,3 +1,0 @@
-SOURCE += swarmCorrections/CFXSwarm/CFXSwarm.C
-
-LIB = $(FOAM_USER_LIBBIN)/libeulerianInterfacialModelsExtend

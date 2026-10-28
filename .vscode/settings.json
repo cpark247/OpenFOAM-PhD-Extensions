@@ -1,9 +1,0 @@
-{
-    "files.associations": {
-        "calcRST.C": "cpp",
-        "calcOmega.C": "cpp",
-        "calcEpsilon.C": "cpp",
-        "hsmFoam.C": "cpp",
-        "pimpleFoam_calcRes.C": "cpp"
-    }
-}

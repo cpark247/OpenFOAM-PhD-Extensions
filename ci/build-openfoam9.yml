@@ -1,0 +1,53 @@
+# MOVE THIS FILE to .github/workflows/build-openfoam9.yml to activate it on GitHub.
+# (Kept here only because .github/ could not be written from the assistant session.)
+# Compiles the whole repository against OpenFOAM Foundation v9 on every push.
+# Uses the official OpenFOAM Foundation Docker image.
+name: build-openfoam9
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: openfoam/openfoam9-paraview56
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compile with wmake
+        shell: bash
+        run: |
+          set +u
+          source /opt/openfoam9/etc/bashrc
+          export WM_NCOMPPROCS=2
+          chmod +x Allwmake bubbleqmom-dev/src/Allwmake \
+            bubbleqmom-dev/applications/utilities/generateMoments/Allwmake \
+            bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/Allwmake \
+            bubbleqmom-dev/applications/solvers/multiphase/multiphaseEulerFoam/*/Allwmake
+          ./Allwmake -j 2 2>&1 | tee build.log
+          # wmake does not always propagate errors through Allwmake scripts,
+          # so fail the job on any compiler or linker error in the log.
+          if grep -E "(error:|Error [0-9]+|undefined reference)" build.log; then
+            echo "::error::Compilation errors found, see build.log"
+            exit 1
+          fi
+
+      - name: List built targets
+        if: always()
+        shell: bash
+        run: |
+          set +u
+          source /opt/openfoam9/etc/bashrc
+          ls -1 "$FOAM_USER_APPBIN" "$FOAM_USER_LIBBIN" || true
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log

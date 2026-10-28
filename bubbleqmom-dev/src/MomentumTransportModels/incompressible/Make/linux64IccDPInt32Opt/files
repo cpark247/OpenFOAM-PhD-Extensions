@@ -1,3 +1,0 @@
-SOURCE += kinematicMomentumTransportModels/kinematicMomentumTransportModels.C
-
-LIB = $(FOAM_USER_LIBBIN)/libincompressibleMomentumTransportModelsExtend

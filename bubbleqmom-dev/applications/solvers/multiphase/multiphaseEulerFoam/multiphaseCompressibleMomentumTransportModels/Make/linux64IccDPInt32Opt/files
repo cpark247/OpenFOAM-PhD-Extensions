@@ -1,3 +1,0 @@
-SOURCE += multiphaseCompressibleMomentumTransportModelsExtend.C
-
-LIB = $(FOAM_USER_LIBBIN)/libmultiphaseMomentumTransportModelsExtend

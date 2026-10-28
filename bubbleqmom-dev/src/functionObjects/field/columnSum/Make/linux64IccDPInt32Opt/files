@@ -1,3 +1,0 @@
-SOURCE += columnSum.C
-
-LIB = $(FOAM_USER_LIBBIN)/libcolumnSumFunctionObject

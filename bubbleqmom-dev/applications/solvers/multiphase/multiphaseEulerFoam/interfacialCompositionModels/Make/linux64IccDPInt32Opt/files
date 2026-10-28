@@ -1,3 +1,0 @@
-SOURCE += surfaceTensionModels/haenschSurfaceTension/haenschSurfaceTension.C
-
-LIB = $(FOAM_USER_LIBBIN)/libeulerianInterfacialCompositionModelsExtend
