@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite the associated paper and this repository."
+message: "If you use this software, please cite this repository. If you use the multiphase solver (bubbleqmom-dev), please also cite the paper listed under references."
 title: "OpenFOAM-PhD-Extensions: solvers, models and boundary conditions for scale-resolving two-phase flow simulation in OpenFOAM v9"
 type: software
 authors:
@@ -15,18 +15,18 @@ keywords:
   - population balance
   - large eddy simulation
   - scale-adaptive simulation
-preferred-citation:
-  type: article
-  title: "Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study"
-  authors:
-    - family-names: Park
-      given-names: Changkyu
-    - family-names: Mansour
-      given-names: Michael
-    - family-names: Thévenin
-      given-names: Dominique
-    - family-names: Skoda
-      given-names: Romuald
-  journal: "SSRN preprint"
-  year: 2026
-  url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860"
+references:
+  - type: article
+    title: "Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study"
+    authors:
+      - family-names: Park
+        given-names: Changkyu
+      - family-names: Mansour
+        given-names: Michael
+      - family-names: Thévenin
+        given-names: Dominique
+      - family-names: Skoda
+        given-names: Romuald
+    journal: "SSRN preprint"
+    year: 2026
+    url: "https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860"

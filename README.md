@@ -1,13 +1,16 @@
 # OpenFOAM-PhD-Extensions
 
-Custom solvers, turbulence and population-balance models, boundary conditions and utilities that I developed during my doctoral research on gas–liquid flows in hydraulic machinery and diverging channels at the Chair of Hydraulic Fluid Machinery, Ruhr University Bochum. Everything targets **OpenFOAM Foundation v9**.
+Custom solvers, turbulence and population-balance models, boundary conditions and utilities that I developed during my doctoral research and the associated industry project on gas–liquid flows in hydraulic machinery and diverging channels, at the Chair of Hydraulic Fluid Machinery, Ruhr University Bochum. Everything targets **OpenFOAM Foundation v9**.
 
 | | |
 |---|---|
-| **Used in** | C. Park, M. Mansour, D. Thévenin, R. Skoda: *Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study*, [SSRN preprint](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860) |
-| **Validation cases** | [turbulence-validation-OF9](https://github.com/cpark247/turbulence-validation-OF9): channel, square duct and asymmetric-diffuser benchmarks run with these tools |
-| **Paper companion** | [gas-accumulation-diverging-channel](https://github.com/cpark247/gas-accumulation-diverging-channel) |
-| **Licence** | GPL-3.0 (derived from OpenFOAM) |
+| Part | Where it was used |
+|---|---|
+| Multiphase solver family (`bubbleqmom-dev/`) | Two-phase LES in C. Park, M. Mansour, D. Thévenin, R. Skoda: *Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study*, [SSRN preprint](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860); companion repo [gas-accumulation-diverging-channel](https://github.com/cpark247/gas-accumulation-diverging-channel) |
+| Turbulence-model variants, single-phase solvers, `perturbU`, `periodicTimeVaryingMappedFixedValue` | Preliminary turbulence-modelling studies during the doctorate (not used for the paper's results): [turbulence-validation-OF9](https://github.com/cpark247/turbulence-validation-OF9) |
+| `porousBafflePressureAMI` | The DLR / VDMA industry project on centrifugal pumps: [virtual-hole-method](https://github.com/cpark247/virtual-hole-method) |
+
+Licence: GPL-3.0 (derived from OpenFOAM).
 
 ---
 
@@ -28,7 +31,7 @@ A hybrid multiphase solver family built on `multiphaseEulerFoam`, extended for *
 
 ### Turbulence models (`turbModels_mod/`)
 
-Compiled into `libincompressibleMomentumTransportModels_mod`; load with `libs ("libincompressibleMomentumTransportModels_mod.so");` in `controlDict`.
+From the preliminary turbulence-modelling work; see [turbulence-validation-OF9](https://github.com/cpark247/turbulence-validation-OF9). Compiled into `libincompressibleMomentumTransportModels_mod`; load with `libs ("libincompressibleMomentumTransportModels_mod.so");` in `controlDict`.
 
 | Model | Change relative to OpenFOAM-9 |
 |---|---|
@@ -50,7 +53,7 @@ Run-time time-averaging is done inside the solver rather than via the `fieldAver
 
 | Boundary condition | What it does |
 |---|---|
-| `porousBafflePressureAMI` | `porousBafflePressure` re-implemented on `fixedJumpAMI`, so it works on **non-conformal** `cyclicAMI` / `cyclicACMI` interfaces. Models a hydraulic resistance (Darcy–Forchheimer pressure jump) on a pair of periodic patches without meshing the physical geometry. This is the core of the *Virtual Hole Method* for holes in centrifugal-pump impeller blades: the hole's effect is set in a dictionary instead of meshing each hole geometry, which cut design iteration cycles from weeks to minutes. Works with single-phase solvers and `multiphaseEulerFoam` |
+| `porousBafflePressureAMI` | `porousBafflePressure` re-implemented on `fixedJumpAMI`, so it works on **non-conformal** `cyclicAMI` / `cyclicACMI` interfaces. Models a hydraulic resistance (Darcy–Forchheimer pressure jump) on a pair of periodic patches without meshing the physical geometry. This is the core of the [Virtual Hole Method](https://github.com/cpark247/virtual-hole-method) for holes in centrifugal-pump impeller blades (industry project, not part of the paper). Works with single-phase solvers and `multiphaseEulerFoam` |
 | `periodicTimeVaryingMappedFixedValue` | Like `timeVaryingMappedFixedValue`, but loops back to the first time once the end of the supplied boundary data is reached. Used to recycle a finite precursor inflow database for long LES runs |
 
 ### Utilities
@@ -111,7 +114,7 @@ This repository contains modified and redistributed third-party GPL code. My own
 
 ## Citation
 
-If you use this code, please cite the paper above and this repository (see `CITATION.cff`).
+If you use the multiphase solver, please cite the paper above. For everything else, cite this repository (see `CITATION.cff`).
 
 ## Licence
 
