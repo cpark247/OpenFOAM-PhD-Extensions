@@ -12,7 +12,7 @@ fi
 
 for dir in \
     turbModels_mod/src/MomentumTransportModels/incompressible \
-    porousBafflePressureAMI periodicTimeVaryingMappedFixedValue \
+    periodicTimeVaryingMappedFixedValue \
     calcEpsilon calcOmega calcRST \
     perturbU/perturbUChannel perturbU/perturbUCylinder perturbU/perturbUGeneric \
     perturbU/perturbUDuct perturbU/perturbURectDuct \

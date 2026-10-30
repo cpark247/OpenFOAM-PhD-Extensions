@@ -1,14 +1,13 @@
 # OpenFOAM-PhD-Extensions
 
-Custom solvers, turbulence and population-balance models, boundary conditions and utilities that I developed during my doctoral research and the associated industry project on gas–liquid flows in hydraulic machinery and diverging channels, at the Chair of Hydraulic Fluid Machinery, Ruhr University Bochum. Everything targets **OpenFOAM Foundation v9**.
+Custom solvers, turbulence and population-balance models, boundary conditions and utilities that I developed during my doctoral research on gas–liquid flows in hydraulic machinery and diverging channels, at the Chair of Hydraulic Fluid Machinery, Ruhr University Bochum. Everything targets **OpenFOAM Foundation v9**.
 
-| | |
-|---|---|
 | Part | Where it was used |
 |---|---|
 | Multiphase solver family (`bubbleqmom-dev/`) | Two-phase LES in C. Park, M. Mansour, D. Thévenin, R. Skoda: *Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study*, [SSRN preprint](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860); companion repo [gas-accumulation-diverging-channel](https://github.com/cpark247/gas-accumulation-diverging-channel) |
 | Turbulence-model variants, single-phase solvers, `perturbU`, `periodicTimeVaryingMappedFixedValue` | Preliminary turbulence-modelling studies during the doctorate (not used for the paper's results): [turbulence-validation-OF9](https://github.com/cpark247/turbulence-validation-OF9) |
-| `porousBafflePressureAMI` | The DLR / VDMA industry project on centrifugal pumps: [virtual-hole-method](https://github.com/cpark247/virtual-hole-method) |
+
+The `porousBafflePressureAMI` boundary condition from the DLR / VDMA industry project on centrifugal pumps has moved to its own repository, [virtual-hole-method](https://github.com/cpark247/virtual-hole-method).
 
 Licence: GPL-3.0 (derived from OpenFOAM).
 
@@ -53,7 +52,6 @@ Run-time time-averaging is done inside the solver rather than via the `fieldAver
 
 | Boundary condition | What it does |
 |---|---|
-| `porousBafflePressureAMI` | `porousBafflePressure` re-implemented on `fixedJumpAMI`, so it works on **non-conformal** `cyclicAMI` / `cyclicACMI` interfaces. Models a hydraulic resistance (Darcy–Forchheimer pressure jump) on a pair of periodic patches without meshing the physical geometry. This is the core of the [Virtual Hole Method](https://github.com/cpark247/virtual-hole-method) for holes in centrifugal-pump impeller blades (industry project, not part of the paper). Works with single-phase solvers and `multiphaseEulerFoam` |
 | `periodicTimeVaryingMappedFixedValue` | Like `timeVaryingMappedFixedValue`, but loops back to the first time once the end of the supplied boundary data is reached. Used to recycle a finite precursor inflow database for long LES runs |
 
 ### Utilities
@@ -79,26 +77,6 @@ cd OpenFOAM-PhD-Extensions
 ```
 
 Libraries are installed to `$FOAM_USER_LIBBIN` and executables to `$FOAM_USER_APPBIN`. `./Allwclean` removes the build output. Components can also be built individually with `wmake <directory>`.
-
-Example use of the boundary condition in `0/p` (both patches of the cyclicACMI pair use it; add `libs ("libporousBafflePressureAMI.so");` to `system/controlDict`):
-
-```c++
-hole_inlet
-{
-    type            porousBafflePressureAMI;
-    patchType       cyclicACMI;
-    jump            uniform 0;
-    D               0;          // Darcy coefficient    [1/m^2]; 0 is fine when inertia dominates
-    I               100;        // inertial coefficient [1/m]
-    length          0.015;      // porous length in flow direction [m]
-    // multiphaseEulerFoam only:
-    // phi  phi.water;  rho  rho.water;  phase  water;
-    // optional: positive false; jumpMax 30;
-    value           uniform 0;
-}
-```
-
-The full option table is in the header of `porousBafflePressureAMIFvPatchField.H`.
 
 ---
 

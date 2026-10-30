@@ -30,7 +30,7 @@ wmakeLnInclude -u turbModels_mod/src/MomentumTransportModels/momentumTransportMo
 wmake $targetType turbModels_mod/src/MomentumTransportModels/incompressible
 
 # 2. Boundary conditions
-wmake $targetType porousBafflePressureAMI
+#    (porousBafflePressureAMI lives in https://github.com/cpark247/virtual-hole-method)
 wmake $targetType periodicTimeVaryingMappedFixedValue
 
 # 3. Pre-/post-processing utilities
