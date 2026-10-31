@@ -4,7 +4,7 @@ Custom solvers, turbulence and population-balance models, boundary conditions an
 
 | Part | Where it was used |
 |---|---|
-| Multiphase solver family (`bubbleqmom-dev/`) | Two-phase LES in C. Park, M. Mansour, D. Thévenin, R. Skoda: *Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study*, [SSRN preprint](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860); companion repo [gas-accumulation-diverging-channel](https://github.com/cpark247/gas-accumulation-diverging-channel) |
+| Multiphase solver family (`bubbleqmom-dev/`) | Two-phase LES in C. Park, M. Mansour, D. Thévenin, R. Skoda: *Passive Mitigation of Gas Accumulation by Surface Structures in Diverging Flow Channels: A Three-Dimensional Two-Phase Flow Simulation Study*, [SSRN preprint](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=7649860); companion repo [diffuser-gas-accumulation](https://github.com/cpark247/diffuser-gas-accumulation) |
 | Turbulence-model variants, single-phase solvers, `perturbU`, `periodicTimeVaryingMappedFixedValue` | Preliminary turbulence-modelling studies during the doctorate (not used for the paper's results): [turbulence-validation-OF9](https://github.com/cpark247/turbulence-validation-OF9) |
 
 The `porousBafflePressureAMI` boundary condition from the DLR / VDMA industry project on centrifugal pumps has moved to its own repository, [virtual-hole-method](https://github.com/cpark247/virtual-hole-method).
